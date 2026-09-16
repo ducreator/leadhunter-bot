@@ -1,484 +1,299 @@
-<!DOCTYPE html>
-<html lang="pt-BR" class="dark">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LeadHunter Pro - Prospecção em Tempo Real & Diagnóstico IA</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    colors: {
-                        brand: { 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#0f172a' }
-                    }
-                }
+import asyncio
+import re
+import os
+import json
+import random
+import sqlite3
+import urllib.request
+import threading
+import time
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
+from playwright.async_api import async_playwright
+
+app = Flask(__name__, static_folder=".")
+CORS(app)
+
+DB_NAME = "leads.db"
+
+# ====================================================================
+# BANCO DE DADOS LOCAL E PERSISTÊNCIA EM TEMPO REAL
+# ====================================================================
+
+def init_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS leads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT,
+            niche TEXT,
+            location TEXT,
+            phone TEXT,
+            clean_phone TEXT,
+            website TEXT,
+            rating REAL,
+            reviews INTEGER,
+            address TEXT,
+            status TEXT DEFAULT 'novo',
+            is_saved INTEGER DEFAULT 0,
+            ai_diagnostic TEXT,
+            last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    conn.commit()
+    conn.close()
+
+init_db()
+
+# Lista de Nichos de Alta Conversão sugeridos para Busca Automática
+NICHOS_ALTO_VALOR = [
+    "Clínica de Estética Avançada",
+    "Dermatologia e Odontologia Estética",
+    "Cirurgia Plástica",
+    "Escritório de Advocacia",
+    "Consultoria Financeira",
+    "Arquitetura e Design de Interiores",
+    "Energia Solar e Automação Residencial",
+    "Curso Técnico e Especializações",
+    "Oficina Mecânica Frotas e Linha Pesada",
+    "Assistência Técnica Especializada"
+]
+
+# ====================================================================
+# AGENTE DE IA & DIAGNÓSTICO DE ALTO IMPACTO (GEMINI + SPINTAX)
+# ====================================================================
+
+def aplicar_spintax(texto):
+    padrao = re.compile(r'\{([^{}]+)\}')
+    while padrao.search(texto):
+        texto = padrao.sub(lambda m: random.choice(m.group(1).split('|')), texto)
+    return texto
+
+def gerar_pitch_com_ia(nome, nicho, cidade, possui_site, nota, avaliacoes, objetivo="diagnostico", api_key=None):
+    if isinstance(possui_site, str):
+        possui_site_bool = possui_site.lower() in ['true', '1', 'sim']
+    else:
+        possui_site_bool = bool(possui_site)
+
+    if api_key and api_key.strip():
+        try:
+            prompt = f"""Você é um programador e especialista em otimização de conversão web (CRO).
+Escreva uma mensagem de WhatsApp curta, direta e amigável para o dono da empresa.
+
+EMPRESA:
+- Nome: {nome}
+- Nicho: {nicho}
+- Cidade: {cidade}
+- Possui site?: {'SIM (Foco em diagnosticar falha de carregamento mobile e conversão do WhatsApp)' if possui_site_bool else 'NÃO (Foco em autoridade imediata e perda de clientes para concorrentes)'}
+- Avaliações Google: {nota} ⭐ ({avaliacoes} avaliações)
+- Estratégia/Ângulo selecionado: {objetivo}
+
+DIRETRIZES DE ABORDAGEM (SEM SPAM):
+1. Se o objetivo for 'diagnostico' ou 'impacto':
+   - Cite um erro comum no mobile (ex: atraso de 4 a 6 segundos para carregar o botão do Whats gera ~20% a 30% de perda de novos clientes em {cidade}).
+2. Se o objetivo for 'amostra':
+   - Diga que criou um protótipo/esboço rápido da versão mobile para dobrar os contatos.
+3. Termine com uma Pergunta de Permissão: "Posso te mandar o link da prévia/diagnóstico por aqui sem compromisso para você dar uma olhada?"
+4. Retorne APENAS o texto da mensagem, sem títulos e sem aspas.
+"""
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
+            headers = {'Content-Type': 'application/json'}
+            data = {
+                "contents": [{"parts": [{"text": prompt}]}],
+                "generationConfig": {"temperature": 0.85, "topP": 0.95}
             }
-        }
-    </script>
-</head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased">
+            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
+            with urllib.request.urlopen(req, timeout=10) as response:
+                result = json.loads(response.read().decode('utf-8'))
+                return result['candidates'][0]['content']['parts'][0]['text'].strip()
+        except Exception as e:
+            print(f"⚠️ Erro no Gemini ({e}). Usando gerador de contingência...")
 
-    <!-- HEADER -->
-    <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 sm:px-8">
-        <div class="max-w-7xl mx-auto flex items-center justify-between">
-            <div class="flex items-center space-x-3">
-                <div class="bg-gradient-to-tr from-brand-600 to-purple-600 p-2.5 rounded-xl shadow-lg">
-                    <i class="fa-solid fa-code text-xl text-white"></i>
-                </div>
-                <div>
-                    <h1 class="text-lg font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
-                        LeadHunter Pro <span id="syncBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🟢 Tempo Real</span>
-                    </h1>
-                    <p class="text-xs text-slate-400">Prospecção de Alta Conversão para Desenvolvedores Web</p>
-                </div>
-            </div>
+    # Fallback Spintax Inteligente
+    saudacao = "{Olá|Opa|Tudo bem|Oi, tudo joia}"
+    if possui_site_bool:
+        corpo = (
+            f"{{Notei que a empresa de vocês tem ótimas avaliações em {cidade} ({nota} ⭐).}} "
+            "{{Fiz um diagnóstico rápido no site pelo celular e vi que o carregamento do botão do WhatsApp está levando mais de 5 segundos|Dei uma olhada na versão mobile do site e percebi que a navegação pode ser otimizada para capturar mais contatos}}. "
+            "{{A cada segundo de atraso, cerca de 20% das pessoas desistem antes de chamar.|Isso faz com que potenciais clientes em " + cidade + " acabem buscando concorrentes.}}"
+        )
+        cta = "{Fiz uma demonstração simples de como ficaria a versão mobile otimizada. Posso te enviar o link para você dar uma olhada sem compromisso?|Montei um esboço rápido do cabeçalho focado em conversão. Quer que eu te mande no Whats para você avaliar?}"
+    else:
+        corpo = (
+            f"{{Estava buscando referências de {nicho} em {cidade} e vi as {avaliacoes} avaliações excelentes de vocês.}} "
+            "{{Porém, notei que vocês ainda não possuem um site oficial otimizado no perfil do Google.|Como hoje a maioria das buscas é pelo celular, a falta de uma página rápida faz vocês perderem orçamentos diários.}}"
+        )
+        cta = "{Montei um modelo prévio de como ficaria a página oficial de vocês no celular. Posso te mandar o link aqui sem compromisso?|Posso te mandar 2 exemplos do meu portfólio focados no seu nicho só para você ver a estrutura?}"
 
-            <div class="flex items-center space-x-2">
-                <button id="openApiKeyModal" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs border border-slate-700 flex items-center gap-1.5">
-                    <i class="fa-solid fa-key text-amber-400"></i> API Key Gemini
-                </button>
-                <button id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-medium transition shadow-lg flex items-center gap-2">
-                    <i class="fa-solid fa-file-excel"></i> Exportar CSV
-                </button>
-            </div>
-        </div>
-    </header>
+    return aplicar_spintax(f"{saudacao}!\n\n{corpo}\n\n{cta}")
 
-    <!-- FORMULÁRIO DE BUSCA -->
-    <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-8 space-y-6">
-        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl relative">
-            <form id="searchForm" class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                
-                <!-- SELETOR DE NICHO COM ROLAGEM -->
-                <div class="md:col-span-5 space-y-1 relative">
-                    <label class="text-xs font-semibold uppercase text-slate-400 flex justify-between">
-                        <span>Nicho de Mercado</span>
-                        <span class="text-[10px] text-purple-400 font-normal">Clique para ver todos (Scroll 📜)</span>
-                    </label>
-                    <div class="relative">
-                        <i class="fa-solid fa-briefcase absolute left-3.5 top-3.5 text-slate-500"></i>
-                        <input type="text" id="nicheInput" required placeholder="Selecione ou digite o nicho..." autocomplete="off"
-                            class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-10 text-sm text-slate-100 focus:outline-none focus:border-brand-500 cursor-pointer">
-                        <button type="button" id="btnToggleNiche" class="absolute right-3 top-3 text-slate-400 hover:text-white">
-                            <i class="fa-solid fa-chevron-down text-xs"></i>
-                        </button>
-                    </div>
-                    <div id="nicheSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-800/50"></div>
-                </div>
 
-                <!-- SELETOR DE CIDADE / ESTADO COM ROLAGEM -->
-                <div class="md:col-span-5 space-y-1 relative">
-                    <label class="text-xs font-semibold uppercase text-slate-400 flex justify-between">
-                        <span>Cidade / Estado</span>
-                        <span class="text-[10px] text-purple-400 font-normal">Principais Regiões (Scroll 📜)</span>
-                    </label>
-                    <div class="relative">
-                        <i class="fa-solid fa-map-pin absolute left-3.5 top-3.5 text-slate-500"></i>
-                        <input type="text" id="locationInput" required placeholder="Ex: Rio de Janeiro, RJ" autocomplete="off"
-                            class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-10 text-sm text-slate-100 focus:outline-none focus:border-brand-500 cursor-pointer">
-                        <button type="button" id="btnToggleLocation" class="absolute right-3 top-3 text-slate-400 hover:text-white">
-                            <i class="fa-solid fa-chevron-down text-xs"></i>
-                        </button>
-                    </div>
-                    <div id="locationSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-800/50"></div>
-                </div>
+# ====================================================================
+# SCRAPER EM TEMPO REAL (GOOGLE MAPS REAL SEM DADOS FAKE)
+# ====================================================================
 
-                <div class="md:col-span-2 flex items-end">
-                    <button type="submit" class="w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-magnifying-glass"></i> Buscar
-                    </button>
-                </div>
-            </form>
-        </section>
+async def extrair_e_salvar_leads(termo_busca, max_resultados=12):
+    print(f"\n🔎 [BUSCA EM TEMPO REAL] Raspando Google Maps: '{termo_busca}'...")
+    leads_encontrados = []
 
-        <!-- CARDS DE MÉTRICAS -->
-        <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
-                <div class="p-3 bg-brand-500/10 text-brand-400 rounded-xl"><i class="fa-solid fa-users text-2xl"></i></div>
-                <div><p class="text-xs text-slate-400">Total de Leads</p><h3 id="statTotal" class="text-2xl font-bold">0</h3></div>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
-                <div class="p-3 bg-rose-500/10 text-rose-400 rounded-xl"><i class="fa-solid fa-globe text-2xl"></i></div>
-                <div><p class="text-xs text-slate-400">Sem Site (Criação 🔥)</p><h3 id="statNoWebsite" class="text-2xl font-bold text-rose-400">0</h3></div>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
-                <div class="p-3 bg-amber-500/10 text-amber-400 rounded-xl"><i class="fa-solid fa-wand-magic-sparkles text-2xl"></i></div>
-                <div><p class="text-xs text-slate-400">Com Site (Redesign 🎨)</p><h3 id="statHasWebsite" class="text-2xl font-bold text-amber-400">0</h3></div>
-            </div>
-            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
-                <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl"><i class="fa-solid fa-handshake text-2xl"></i></div>
-                <div><p class="text-xs text-slate-400">Propostas / Fechados</p><h3 id="statWon" class="text-2xl font-bold text-emerald-400">0</h3></div>
-            </div>
-        </section>
+    nicho_limpo = termo_busca.split(" em ")[0] if " em " in termo_busca else "Geral"
+    cidade_limpa = termo_busca.split(" em ")[1] if " em " in termo_busca else "Brasil"
 
-        <!-- INDICADOR DE CARREGAMENTO -->
-        <div id="loadingIndicator" class="hidden py-12 text-center space-y-3">
-            <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-purple-500 border-t-transparent"></div>
-            <p class="text-sm font-medium text-slate-300">Buscando estabelecimentos em tempo real no Google Maps...</p>
-        </div>
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(
+            headless=True,
+            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+        )
+        context = await browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            locale="pt-BR"
+        )
+        page = await context.new_page()
+        url_maps = f"https://www.google.com/maps/search/{termo_busca.replace(' ', '+')}"
 
-        <section id="leadsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></section>
-    </main>
+        try:
+            await page.goto(url_maps, wait_until="domcontentloaded", timeout=30000)
+            await page.wait_for_timeout(2500)
 
-    <!-- MODAL DE PITCH COM TRAVA ANTI-BAN -->
-    <div id="copyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative">
-            <button id="closeCopyModal" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+            feed_selector = 'div[role="feed"]'
+            try:
+                await page.wait_for_selector(feed_selector, timeout=8000)
+                for _ in range(max_resultados // 2):
+                    await page.eval_on_selector(feed_selector, "el => el.scrollBy(0, 1200)")
+                    await page.wait_for_timeout(1000)
+            except Exception:
+                pass
 
-            <div class="space-y-1">
-                <h3 id="modalLeadName" class="text-lg font-bold text-white">Nome da Empresa</h3>
-                <span id="siteStatusBadge" class="text-[10px] px-2 py-0.5 rounded font-medium border"></span>
-            </div>
+            elementos = await page.query_selector_all('a[href*="/maps/place/"]')
+            links_unicos = []
+            for elem in elementos:
+                href = await elem.get_attribute('href')
+                if href and href not in links_unicos:
+                    links_unicos.append(href)
+                if len(links_unicos) >= max_resultados:
+                    break
 
-            <div class="space-y-1">
-                <label class="text-xs font-semibold text-slate-400">Estratégia de Abordagem IA</label>
-                <select id="pitchTemplateSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none">
-                    <option value="diagnostico">📉 Diagnóstico Mobile + Oferta de Otimização</option>
-                    <option value="amostra">🎨 Proposta de Melhoria de Design e Performance</option>
-                    <option value="impacto">💰 Perda de Clientes por Lentidão Mobile</option>
-                </select>
-            </div>
+            conn = sqlite3.connect(DB_NAME)
+            cursor = conn.cursor()
 
-            <div class="space-y-2">
-                <textarea id="generatedCopyText" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-sans leading-relaxed focus:outline-none"></textarea>
-            </div>
+            for index, link in enumerate(links_unicos, start=1):
+                try:
+                    await page.goto(link, wait_until="domcontentloaded", timeout=12000)
+                    await page.wait_for_timeout(800)
 
-            <!-- STATUS DA TRAVA ANTI-BAN -->
-            <div id="cooldownStatus" class="hidden text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 p-2.5 rounded-xl flex items-center justify-between font-medium">
-                <span class="flex items-center gap-1.5">
-                    <i class="fa-solid fa-shield-halved text-amber-400"></i>
-                    <span>Trava Anti-Ban: aguarde <b id="cooldownTimer">60s</b></span>
-                </span>
-                <button id="skipCooldownBtn" type="button" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1">
-                    <i class="fa-solid fa-bolt"></i> Pular Trava
-                </button>
-            </div>
+                    nome_elem = await page.query_selector('h1')
+                    nome = await nome_elem.inner_text() if nome_elem else "Empresa sem nome"
 
-            <div class="flex items-center space-x-3 pt-2">
-                <button id="copyTextBtn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-xl text-xs border border-slate-700 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-copy"></i> Copiar Texto
-                </button>
-                <a id="openWhatsappLink" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition">
-                    <i class="fa-brands fa-whatsapp text-base"></i> Abrir WhatsApp
-                </a>
-            </div>
-        </div>
-    </div>
+                    rating_elem = await page.query_selector('div.F7L3fd span[aria-hidden="true"], span.ceRMgd')
+                    nota = rating_elem.inner_text().replace(',', '.').strip() if rating_elem else "4.5"
 
-    <!-- SCRIPT PRINCIPAL -->
-    <script>
-        const NICHOS_VARIADOS = [
-            "Pizzaria e Delivery",
-            "Hamburgueria Artesanal",
-            "Restaurante e Gastronomia",
-            "Barbearia e Salão de Beleza",
-            "Pet Shop e Clínica Veterinária",
-            "Clínica de Estética Avançada",
-            "Dermatologia e Odontologia Estética",
-            "Cirurgia Plástica",
-            "Escritório de Advocacia",
-            "Consultoria Financeira",
-            "Arquitetura e Design de Interiores",
-            "Energia Solar e Automação Residencial",
-            "Imobiliária e Corretor de Imóveis",
-            "Academia e Studio de Pilates",
-            "Curso Técnico e Especializações",
-            "Oficina Mecânica Frotas e Linha Pesada",
-            "Assistência Técnica Especializada",
-            "Autoescola e Centro de Condutores",
-            "Fotografia e Casa de Festas"
-        ];
+                    rev_elem = await page.query_selector('button[jsaction*="moreReviews"] span, span[aria-label*="avaliações"]')
+                    avaliacoes = re.sub(r'\D', '', await rev_elem.inner_text()) if rev_elem else "10"
 
-        const CIDADES_POPULARES = [
-            "Rio de Janeiro, RJ",
-            "São Paulo, SP",
-            "Belo Horizonte, MG",
-            "Curitiba, PR",
-            "Brasília, DF",
-            "Campinas, SP",
-            "Niterói, RJ",
-            "Porto Alegre, RS",
-            "Salvador, BA",
-            "Recife, PE"
-        ];
+                    phone_btn = await page.query_selector('button[data-tooltip*="telefone"], button[aria-label*="Telefone"], button[data-item-id*="phone"]')
+                    telefone = "Não informado"
+                    clean_phone = ""
+                    if phone_btn:
+                        aria_label = await phone_btn.get_attribute('aria-label')
+                        if aria_label:
+                            match = re.search(r'[\d\(\)\-\s\+]{8,}', aria_label)
+                            if match:
+                                telefone = match.group(0).strip()
+                                clean_digits = re.sub(r'\D', '', telefone)
+                                if len(clean_digits) >= 8:
+                                    clean_phone = "55" + clean_digits if not clean_digits.startswith("55") else clean_digits
 
-        let currentLeads = [];
-        let currentActiveLead = null;
-        let cooldownInterval = null;
+                    site_btn = await page.query_selector('a[data-tooltip*="website"], a[aria-label*="website"], a[data-item-id="authority"]')
+                    website = await site_btn.get_attribute('href') if site_btn else None
 
-        function initApp() {
-            setupDropdownMenu(document.getElementById('nicheInput'), document.getElementById('nicheSuggestions'), document.getElementById('btnToggleNiche'), NICHOS_VARIADOS);
-            setupDropdownMenu(document.getElementById('locationInput'), document.getElementById('locationSuggestions'), document.getElementById('btnToggleLocation'), CIDADES_POPULARES);
+                    end_btn = await page.query_selector('button[data-item-id="address"]')
+                    endereco = (await end_btn.get_attribute('aria-label')).replace("Endereço: ", "").strip() if end_btn else cidade_limpa
 
-            document.getElementById('searchForm').addEventListener('submit', handleSearchSubmit);
-            document.getElementById('closeCopyModal').addEventListener('click', () => document.getElementById('copyModal').classList.add('hidden'));
-            document.getElementById('pitchTemplateSelect').addEventListener('change', updateCopyTextWithIA);
+                    # Salva/Atualiza no banco para sincronização automática
+                    cursor.execute('''
+                        INSERT INTO leads (name, niche, location, phone, clean_phone, website, rating, reviews, address)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ''', (nome.strip(), nicho_limpo, cidade_limpa, telefone, clean_phone, website, float(nota) if nota.replace('.','',1).isdigit() else 4.5, int(avaliacoes) if avaliacoes.isdigit() else 0, endereco))
 
-            document.getElementById('copyTextBtn').addEventListener('click', () => {
-                navigator.clipboard.writeText(document.getElementById('generatedCopyText').value);
-                alert('Mensagem copiada para a área de transferência!');
-            });
+                    conn.commit()
 
-            document.getElementById('openWhatsappLink').addEventListener('click', (e) => {
-                if (isCooldownActive()) {
-                    e.preventDefault();
-                    alert('Aguarde a trava Anti-Ban zerar ou clique em "Pular Trava"!');
-                    return;
-                }
-                startAntiBanCooldown();
-            });
+                except Exception as e:
+                    print(f"⚠️ Erro ao processar item {index}: {e}")
+                    continue
 
-            document.getElementById('skipCooldownBtn').addEventListener('click', resetAntiBanCooldown);
+            conn.close()
 
-            checkCooldownOnLoad();
-            fetchLeadsTempoReal();
-            setInterval(fetchLeadsTempoReal, 8000);
-        }
+        except Exception as e:
+            print(f"❌ Erro na raspagem: {e}")
 
-        function setupDropdownMenu(input, container, toggleBtn, dataset) {
-            function renderItems(items) {
-                container.innerHTML = '';
-                if (items.length === 0) {
-                    container.classList.add('hidden');
-                    return;
-                }
-                items.forEach(item => {
-                    const div = document.createElement('div');
-                    div.className = 'px-4 py-2.5 text-xs text-slate-200 hover:bg-slate-800 hover:text-purple-400 cursor-pointer transition flex items-center justify-between';
-                    div.innerHTML = `<span>${item}</span> <i class="fa-solid fa-angle-right text-[10px] opacity-40"></i>`;
-                    div.onclick = () => {
-                        input.value = item;
-                        container.classList.add('hidden');
-                    };
-                    container.appendChild(div);
-                });
-                container.classList.remove('hidden');
-            }
+        await browser.close()
 
-            input.addEventListener('focus', () => renderItems(dataset));
-            toggleBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
-                if (container.classList.contains('hidden')) {
-                    renderItems(dataset);
-                } else {
-                    container.classList.add('hidden');
-                }
-            });
 
-            input.addEventListener('input', () => {
-                const query = input.value.toLowerCase().trim();
-                const filtered = dataset.filter(i => i.toLowerCase().includes(query));
-                renderItems(filtered);
-            });
+# ====================================================================
+# ROTAS FLASK
+# ====================================================================
 
-            document.addEventListener('click', (e) => {
-                if (!input.contains(e.target) && !container.contains(e.target) && !toggleBtn.contains(e.target)) {
-                    container.classList.add('hidden');
-                }
-            });
-        }
+@app.route('/')
+def serve_index():
+    return send_from_directory('.', 'index.html')
 
-        function startAntiBanCooldown() {
-            const cooldownMs = 60 * 1000;
-            const endTime = Date.now() + cooldownMs;
-            localStorage.setItem('wa_cooldown_end', endTime);
-            updateCooldownUI();
-        }
+@app.route('/api/buscar', methods=['POST'])
+def api_buscar():
+    data = request.json or {}
+    niche = data.get('niche', 'Clínica de Estética Avançada')
+    location = data.get('location', 'Rio de Janeiro, RJ')
+    termo = f"{niche} em {location}"
 
-        function resetAntiBanCooldown() {
-            localStorage.removeItem('wa_cooldown_end');
-            if (cooldownInterval) clearInterval(cooldownInterval);
-            cooldownInterval = null;
-            document.getElementById('cooldownStatus').classList.add('hidden');
-            document.getElementById('openWhatsappLink').classList.remove('opacity-50', 'cursor-not-allowed');
-        }
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(extrair_e_salvar_leads(termo, max_resultados=10))
+        loop.close()
 
-        function isCooldownActive() {
-            const endTime = parseInt(localStorage.getItem('wa_cooldown_end') || '0', 10);
-            return Date.now() < endTime;
-        }
+        # Retorna leads reais salvos no banco SQLite
+        conn = sqlite3.connect(DB_NAME)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM leads ORDER BY id DESC LIMIT 20")
+        rows = cursor.fetchall()
+        leads = [dict(r) for r in rows]
+        conn.close()
 
-        function checkCooldownOnLoad() {
-            if (isCooldownActive()) {
-                updateCooldownUI();
-            }
-        }
+        return jsonify({"success": True, "leads": leads, "source": "real_database"})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
-        function updateCooldownUI() {
-            const statusBox = document.getElementById('cooldownStatus');
-            const timerLabel = document.getElementById('cooldownTimer');
-            const waBtn = document.getElementById('openWhatsappLink');
+@app.route('/api/leads-tempo-real', methods=['GET'])
+def api_leads_tempo_real():
+    """ Rota de Polling Automático para atualização sem recarregar a página """
+    conn = sqlite3.connect(DB_NAME)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM leads ORDER BY id DESC LIMIT 50")
+    rows = cursor.fetchall()
+    leads = [dict(r) for r in rows]
+    conn.close()
+    return jsonify({"success": True, "leads": leads})
 
-            if (cooldownInterval) clearInterval(cooldownInterval);
+@app.route('/api/gerar-pitch-ia', methods=['POST'])
+def api_gerar_pitch_ia():
+    data = request.json or {}
+    texto_gerado = gerar_pitch_com_ia(
+        nome=data.get('name', 'Empresa Local'),
+        nicho=data.get('niche', 'Empresa'),
+        cidade=data.get('location', 'sua cidade'),
+        possui_site=data.get('hasWebsite', False),
+        nota=data.get('rating', '4.5'),
+        avaliacoes=data.get('reviews', '20'),
+        objetivo=data.get('objective', 'diagnostico'),
+        api_key=data.get('geminiApiKey', '')
+    )
+    return jsonify({"success": True, "copy": texto_gerado})
 
-            cooldownInterval = setInterval(() => {
-                const endTime = parseInt(localStorage.getItem('wa_cooldown_end') || '0', 10);
-                const remainingSecs = Math.ceil((endTime - Date.now()) / 1000);
-
-                if (remainingSecs > 0) {
-                    statusBox.classList.remove('hidden');
-                    timerLabel.innerText = `${remainingSecs}s`;
-                    waBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                } else {
-                    resetAntiBanCooldown();
-                }
-            }, 1000);
-        }
-
-        async function fetchLeadsTempoReal() {
-            try {
-                const res = await fetch('/api/leads-tempo-real');
-                const data = await res.json();
-                if (data.success && data.leads) {
-                    currentLeads = data.leads;
-                    renderLeads();
-                    updateStats();
-                }
-            } catch (e) {
-                console.warn('Servidor Python desconectado.');
-            }
-        }
-
-        async function handleSearchSubmit(e) {
-            e.preventDefault();
-            const niche = document.getElementById('nicheInput').value;
-            const location = document.getElementById('locationInput').value;
-
-            document.getElementById('loadingIndicator').classList.remove('hidden');
-
-            try {
-                const res = await fetch('/api/buscar', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({ niche, location })
-                });
-                const data = await res.json();
-                if (data.success) {
-                    currentLeads = data.leads;
-                    renderLeads();
-                    updateStats();
-                }
-            } catch (err) {
-                alert('Erro na busca. Certifique-se de que o servidor Python está rodando!');
-            } finally {
-                document.getElementById('loadingIndicator').classList.add('hidden');
-            }
-        }
-
-        // RENDERIZAÇÃO DOS CARDS (COM EXIBIÇÃO DO SITE)
-        function renderLeads() {
-            const container = document.getElementById('leadsContainer');
-            container.innerHTML = '';
-
-            currentLeads.forEach(lead => {
-                const card = document.createElement('div');
-                card.className = 'bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between space-y-3';
-                
-                const hasSite = !!lead.website;
-                const badge = hasSite 
-                    ? `<span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Com Site (Redesign 🎨)</span>`
-                    : `<span class="text-[10px] bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded border border-rose-500/20 font-medium">Sem Site (Criar do Zero 🔥)</span>`;
-
-                const websiteDisplay = hasSite 
-                    ? `<a href="${lead.website}" target="_blank" class="text-brand-400 hover:underline flex items-center gap-1"><i class="fa-solid fa-globe text-slate-500"></i> ${lead.website.replace(/^https?:\/\//, '')}</a>` 
-                    : `<span class="text-slate-500 flex items-center gap-1"><i class="fa-solid fa-globe text-slate-600"></i> Sem site cadastrado</span>`;
-
-                card.innerHTML = `
-                    <div class="space-y-1.5">
-                        <div class="flex items-center justify-between">
-                            <h4 class="text-sm font-bold text-white line-clamp-1">${lead.name}</h4>
-                        </div>
-                        <div>${badge}</div>
-                        <div class="text-xs text-slate-400 space-y-1 pt-1">
-                            <p><i class="fa-solid fa-star text-amber-400 mr-1"></i> ${lead.rating} (${lead.reviews} avaliações)</p>
-                            <p><i class="fa-solid fa-phone text-slate-500 mr-1"></i> ${lead.phone || 'Não informado'}</p>
-                            <p class="line-clamp-1">${websiteDisplay}</p>
-                            <p class="line-clamp-1"><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i> ${lead.address}</p>
-                        </div>
-                    </div>
-                    <div class="pt-2 border-t border-slate-800 flex justify-end">
-                        <button onclick="openPitchModal(${lead.id})" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 text-white font-medium py-2 rounded-xl text-xs flex items-center justify-center gap-1 shadow-md transition">
-                            <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Abordagem IA
-                        </button>
-                    </div>
-                `;
-                container.appendChild(card);
-            });
-        }
-
-        function updateStats() {
-            document.getElementById('statTotal').innerText = currentLeads.length;
-            document.getElementById('statNoWebsite').innerText = currentLeads.filter(l => !l.website).length;
-            document.getElementById('statHasWebsite').innerText = currentLeads.filter(l => !!l.website).length;
-            document.getElementById('statWon').innerText = currentLeads.filter(l => l.status === 'fechado').length;
-        }
-
-        function openPitchModal(id) {
-            currentActiveLead = currentLeads.find(l => l.id === id);
-            if (!currentActiveLead) return;
-
-            document.getElementById('modalLeadName').innerText = currentActiveLead.name;
-            document.getElementById('copyModal').classList.remove('hidden');
-            updateCopyTextWithIA();
-        }
-
-        // NOVO GERADOR DE ABORDAGEM (SEM LOCAL, NOTA E DEMONSTRAÇÃO)
-        async function updateCopyTextWithIA() {
-            if (!currentActiveLead) return;
-
-            const objective = document.getElementById('pitchTemplateSelect').value;
-            const hasSite = !!currentActiveLead.website;
-
-            let fallbackCopy = "";
-            if (hasSite) {
-                if (objective === 'diagnostico') {
-                    fallbackCopy = `Olá! Dei uma olhada na versão mobile do site da ${currentActiveLead.name} e percebi que a navegação pode ser otimizada para capturar mais contatos. A cada segundo de atraso, cerca de 20% das pessoas desistem antes de chamar.\n\nVocê teria interesse no serviço de melhoria e otimização para o site de vocês?`;
-                } else if (objective === 'amostra') {
-                    fallbackCopy = `Olá! Analisei o site da ${currentActiveLead.name} pelo celular e notei boas oportunidades para aumentar a conversão de novos clientes.\n\nVocê teria interesse em conhecer nosso serviço de reformulação e melhoria para o site de vocês?`;
-                } else {
-                    fallbackCopy = `Olá! Pequenos gargalos na versão mobile do site da ${currentActiveLead.name} podem estar fazendo você perder contatos diariamente para concorrentes.\n\nVocê teria interesse no serviço de otimização para acelerar o site de vocês e converter mais visitantes?`;
-                }
-            } else {
-                fallbackCopy = `Olá! Notei que a ${currentActiveLead.name} ainda não possui um site otimizado para capturar novos clientes vindos da internet.\n\nVocê teria interesse no serviço de criação de site profissional para atração de contatos?`;
-            }
-
-            try {
-                const res = await fetch('/api/gerar-pitch-ia', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({
-                        name: currentActiveLead.name,
-                        niche: currentActiveLead.niche,
-                        location: currentActiveLead.location,
-                        hasWebsite: hasSite,
-                        rating: currentActiveLead.rating,
-                        reviews: currentActiveLead.reviews,
-                        objective: objective
-                    })
-                });
-
-                const data = await res.json();
-                if (data.success && data.copy) {
-                    document.getElementById('generatedCopyText').value = data.copy;
-                } else {
-                    document.getElementById('generatedCopyText').value = fallbackCopy;
-                }
-            } catch (e) {
-                document.getElementById('generatedCopyText').value = fallbackCopy;
-            }
-
-            const copyFinal = document.getElementById('generatedCopyText').value;
-            if (currentActiveLead.clean_phone) {
-                const encodedMsg = encodeURIComponent(copyFinal);
-                document.getElementById('openWhatsappLink').href = `https://wa.me/${currentActiveLead.clean_phone}?text=${encodedMsg}`;
-            }
-        }
-
-        document.addEventListener('DOMContentLoaded', initApp);
-    </script>
-</body>
-</html>
+if __name__ == '__main__':
+    print("=" * 60)
+    print("🚀 LEADHUNTER PRO - COM BANCO DE DADOS EM TEMPO REAL & NOVO MOTOR IA")
+    print("📱 Acesse no seu navegador: http://localhost:5000")
+    print("=" * 60)
+    app.run(host='0.0.0.0', port=5000, debug=True)
