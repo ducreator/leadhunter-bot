@@ -1,916 +1,484 @@
-<!-- Chosen Palette: Slate Dark & Emerald Accent Palette -->
-<!-- Application Structure Plan: Integrated dashboard architecture designed for developer sales workflows. Features top KPI counters for lead segmentation (site vs no site), instant client filtering/sorting, local Google Maps scraper integration with dynamic offline simulation fallback, and an interactive WhatsApp Pitch Modal with AI/Spintax text generation and an enforced 60-second Anti-Ban cooldown lock to prevent spam flagging on WhatsApp. Sandboxed safe-storage error handlers added to ensure instant rendering across all browser iframe contexts. -->
-<!-- Visualization & Content Choices: Metric KPI summary cards (HTML/CSS), dynamic grid of interactive lead cards, WhatsApp pitch modal with AI variation generator, 60-second safety lock counter with explanatory notice and reset override, dynamic status filters, dynamic fallback engine when backend is offline, and CSV export mechanism. Confirming NO SVG graphics used. NO Mermaid JS used. -->
-<!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
 <!DOCTYPE html>
 <html lang="pt-BR" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LeadHunter Pro - Agente IA & Anti-Ban WhatsApp</title>
+    <title>LeadHunter Pro - Prospecção em Tempo Real & Diagnóstico IA</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
     <script>
         tailwind.config = {
             darkMode: 'class',
             theme: {
                 extend: {
                     colors: {
-                        brand: {
-                            50: '#f0f6ff',
-                            500: '#3b82f6',
-                            600: '#2563eb',
-                            700: '#1d4ed8',
-                            900: '#0f172a',
-                        }
-                    },
-                    fontFamily: {
-                        sans: ['Inter', 'sans-serif'],
+                        brand: { 500: '#3b82f6', 600: '#2563eb', 700: '#1d4ed8', 900: '#0f172a' }
                     }
                 }
             }
         }
     </script>
-    
-    <style>
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: #0f172a;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #334155;
-            border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #475569;
-        }
-    </style>
 </head>
-<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased selection:bg-brand-500 selection:text-white">
+<body class="bg-slate-950 text-slate-100 font-sans min-h-screen flex flex-col antialiased">
 
+    <!-- HEADER -->
     <header class="sticky top-0 z-30 bg-slate-900/90 backdrop-blur-md border-b border-slate-800 px-4 py-3 sm:px-8">
         <div class="max-w-7xl mx-auto flex items-center justify-between">
             <div class="flex items-center space-x-3">
-                <div class="bg-gradient-to-tr from-brand-600 via-indigo-500 to-purple-600 p-2.5 rounded-xl shadow-lg shadow-brand-500/20">
+                <div class="bg-gradient-to-tr from-brand-600 to-purple-600 p-2.5 rounded-xl shadow-lg">
                     <i class="fa-solid fa-code text-xl text-white"></i>
                 </div>
                 <div>
-                    <h1 class="text-lg font-bold tracking-tight bg-gradient-to-r from-white via-slate-200 to-slate-400 bg-clip-text text-transparent sm:text-xl flex items-center gap-2">
-                        LeadHunter <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1"><i class="fa-solid fa-shield-halved text-[10px]"></i> Anti-Ban 1min</span>
+                    <h1 class="text-lg font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent flex items-center gap-2">
+                        LeadHunter Pro <span id="syncBadge" class="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">🟢 Tempo Real</span>
                     </h1>
-                    <p class="text-xs text-slate-400 hidden sm:block">Prospecção de Clientes para Programadores e Desenvolvedores de Sites</p>
+                    <p class="text-xs text-slate-400">Prospecção de Alta Conversão para Desenvolvedores Web</p>
                 </div>
             </div>
 
             <div class="flex items-center space-x-2">
-                <button id="openApiKeyModal" class="flex items-center space-x-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs font-medium border border-slate-700 transition">
-                    <i class="fa-solid fa-key text-amber-400"></i>
-                    <span class="hidden sm:inline">Chave Gemini IA</span>
+                <button id="openApiKeyModal" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs border border-slate-700 flex items-center gap-1.5">
+                    <i class="fa-solid fa-key text-amber-400"></i> API Key Gemini
                 </button>
-                <button id="exportCsvBtn" class="flex items-center space-x-2 bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-sm font-medium transition shadow-lg shadow-emerald-600/20">
-                    <i class="fa-solid fa-file-excel"></i>
-                    <span class="hidden sm:inline">Exportar CSV</span>
+                <button id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-medium transition shadow-lg flex items-center gap-2">
+                    <i class="fa-solid fa-file-excel"></i> Exportar CSV
                 </button>
             </div>
         </div>
     </header>
 
+    <!-- FORMULÁRIO DE BUSCA -->
     <main class="flex-1 max-w-7xl w-full mx-auto px-4 py-6 sm:px-8 space-y-6">
-        
-        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl relative overflow-visible">
-            <div class="absolute -top-24 -right-24 w-60 h-60 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
-            
-            <form id="searchForm" class="space-y-4">
-                <div class="grid grid-cols-1 md:grid-cols-12 gap-4">
-                    <div class="md:col-span-5 space-y-1 relative">
-                        <label class="text-xs font-semibold uppercase tracking-wider text-slate-400 ml-1">Nicho / Ocupação</label>
-                        <div class="relative">
-                            <i class="fa-solid fa-briefcase absolute left-3.5 top-3.5 text-slate-500 z-10"></i>
-                            <input type="text" id="nicheInput" required placeholder="Ex: Contabilidade, Hamburguerias, Dentistas" autocomplete="off"
-                                class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition">
-                        </div>
-                        <div id="nicheSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto divide-y divide-slate-800/60"></div>
-                    </div>
-
-                    <div class="md:col-span-5 space-y-1 relative">
-                        <label class="text-xs font-semibold uppercase tracking-wider text-slate-400 ml-1">Cidade / Estado</label>
-                        <div class="relative">
-                            <i class="fa-solid fa-map-pin absolute left-3.5 top-3.5 text-slate-500 z-10"></i>
-                            <input type="text" id="locationInput" required placeholder="Ex: Rio de Janeiro, RJ" autocomplete="off"
-                                class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-4 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-500 focus:ring-1 focus:ring-brand-500 transition">
-                        </div>
-                        <div id="locationSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 rounded-xl shadow-2xl z-50 max-h-48 overflow-y-auto divide-y divide-slate-800/60"></div>
-                    </div>
-
-                    <div class="md:col-span-2 flex items-end">
-                        <button type="submit" id="searchBtn" class="w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 hover:to-purple-500 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg shadow-brand-600/30 transition flex items-center justify-center space-x-2">
-                            <i class="fa-solid fa-magnifying-glass"></i>
-                            <span>Buscar</span>
+        <section class="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-6 shadow-xl relative">
+            <form id="searchForm" class="grid grid-cols-1 md:grid-cols-12 gap-4">
+                
+                <!-- SELETOR DE NICHO COM ROLAGEM -->
+                <div class="md:col-span-5 space-y-1 relative">
+                    <label class="text-xs font-semibold uppercase text-slate-400 flex justify-between">
+                        <span>Nicho de Mercado</span>
+                        <span class="text-[10px] text-purple-400 font-normal">Clique para ver todos (Scroll 📜)</span>
+                    </label>
+                    <div class="relative">
+                        <i class="fa-solid fa-briefcase absolute left-3.5 top-3.5 text-slate-500"></i>
+                        <input type="text" id="nicheInput" required placeholder="Selecione ou digite o nicho..." autocomplete="off"
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-10 text-sm text-slate-100 focus:outline-none focus:border-brand-500 cursor-pointer">
+                        <button type="button" id="btnToggleNiche" class="absolute right-3 top-3 text-slate-400 hover:text-white">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
                         </button>
                     </div>
+                    <div id="nicheSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-800/50"></div>
+                </div>
+
+                <!-- SELETOR DE CIDADE / ESTADO COM ROLAGEM -->
+                <div class="md:col-span-5 space-y-1 relative">
+                    <label class="text-xs font-semibold uppercase text-slate-400 flex justify-between">
+                        <span>Cidade / Estado</span>
+                        <span class="text-[10px] text-purple-400 font-normal">Principais Regiões (Scroll 📜)</span>
+                    </label>
+                    <div class="relative">
+                        <i class="fa-solid fa-map-pin absolute left-3.5 top-3.5 text-slate-500"></i>
+                        <input type="text" id="locationInput" required placeholder="Ex: Rio de Janeiro, RJ" autocomplete="off"
+                            class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 pl-10 pr-10 text-sm text-slate-100 focus:outline-none focus:border-brand-500 cursor-pointer">
+                        <button type="button" id="btnToggleLocation" class="absolute right-3 top-3 text-slate-400 hover:text-white">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </button>
+                    </div>
+                    <div id="locationSuggestions" class="hidden absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-56 overflow-y-auto divide-y divide-slate-800/50"></div>
+                </div>
+
+                <div class="md:col-span-2 flex items-end">
+                    <button type="submit" class="w-full bg-gradient-to-r from-brand-600 to-purple-600 hover:from-brand-500 text-white font-semibold py-2.5 px-4 rounded-xl shadow-lg flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-magnifying-glass"></i> Buscar
+                    </button>
                 </div>
             </form>
         </section>
 
+        <!-- CARDS DE MÉTRICAS -->
         <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4 shadow-md">
-                <div class="p-3 bg-brand-500/10 text-brand-400 rounded-xl shrink-0">
-                    <i class="fa-solid fa-users text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-slate-400">Total de Leads</p>
-                    <h3 id="statTotal" class="text-2xl font-bold text-white">0</h3>
-                </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
+                <div class="p-3 bg-brand-500/10 text-brand-400 rounded-xl"><i class="fa-solid fa-users text-2xl"></i></div>
+                <div><p class="text-xs text-slate-400">Total de Leads</p><h3 id="statTotal" class="text-2xl font-bold">0</h3></div>
             </div>
-
-            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4 shadow-md">
-                <div class="p-3 bg-rose-500/10 text-rose-400 rounded-xl shrink-0">
-                    <i class="fa-solid fa-globe text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-slate-400">Sem Site (Criação 🔥)</p>
-                    <h3 id="statNoWebsite" class="text-2xl font-bold text-rose-400">0</h3>
-                </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
+                <div class="p-3 bg-rose-500/10 text-rose-400 rounded-xl"><i class="fa-solid fa-globe text-2xl"></i></div>
+                <div><p class="text-xs text-slate-400">Sem Site (Criação 🔥)</p><h3 id="statNoWebsite" class="text-2xl font-bold text-rose-400">0</h3></div>
             </div>
-
-            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4 shadow-md">
-                <div class="p-3 bg-amber-500/10 text-amber-400 rounded-xl shrink-0">
-                    <i class="fa-solid fa-wand-magic-sparkles text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-slate-400">Com Site (Redesign 🎨)</p>
-                    <h3 id="statHasWebsite" class="text-2xl font-bold text-amber-400">0</h3>
-                </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
+                <div class="p-3 bg-amber-500/10 text-amber-400 rounded-xl"><i class="fa-solid fa-wand-magic-sparkles text-2xl"></i></div>
+                <div><p class="text-xs text-slate-400">Com Site (Redesign 🎨)</p><h3 id="statHasWebsite" class="text-2xl font-bold text-amber-400">0</h3></div>
             </div>
-
-            <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4 shadow-md">
-                <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl shrink-0">
-                    <i class="fa-solid fa-handshake text-2xl"></i>
-                </div>
-                <div>
-                    <p class="text-xs font-medium text-slate-400">Propostas / Vendas</p>
-                    <h3 id="statWon" class="text-2xl font-bold text-emerald-400">0</h3>
-                </div>
+            <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex items-center space-x-4">
+                <div class="p-3 bg-emerald-500/10 text-emerald-400 rounded-xl"><i class="fa-solid fa-handshake text-2xl"></i></div>
+                <div><p class="text-xs text-slate-400">Propostas / Fechados</p><h3 id="statWon" class="text-2xl font-bold text-emerald-400">0</h3></div>
             </div>
         </section>
 
-        <section class="bg-slate-900/60 border border-slate-800 rounded-2xl p-4 space-y-3">
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <div class="flex items-center space-x-2 overflow-x-auto pb-1 sm:pb-0 w-full lg:w-auto">
-                    <button data-filter="all" class="filter-btn active bg-brand-600 text-white px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition">
-                        Todos
-                    </button>
-                    <button data-filter="no-website" class="filter-btn bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition">
-                        ⚠️ Sem Site (Criar do Zero)
-                    </button>
-                    <button data-filter="has-website" class="filter-btn bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition">
-                        🎨 Com Site (Redesign)
-                    </button>
-                    <button data-filter="contacted" class="filter-btn bg-slate-900 hover:bg-slate-800 text-slate-300 border border-slate-800 px-3.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition">
-                        📱 Contatados
-                    </button>
-                </div>
-
-                <div class="flex items-center space-x-3 w-full sm:w-auto">
-                    <div class="relative flex-1 sm:w-48">
-                        <i class="fa-solid fa-filter absolute left-3 top-2.5 text-xs text-slate-500"></i>
-                        <input type="text" id="internalSearch" placeholder="Filtrar por nome..." 
-                            class="w-full bg-slate-950 border border-slate-800 rounded-lg py-1.5 pl-8 pr-3 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
-                    </div>
-
-                    <select id="sortSelect" class="bg-slate-950 border border-slate-800 rounded-lg py-1.5 px-3 text-xs text-slate-200 focus:outline-none focus:border-brand-500">
-                        <option value="default">Padrão</option>
-                        <option value="rating-desc">Maior Nota ⭐</option>
-                        <option value="reviews-desc">Mais Avaliações 💬</option>
-                        <option value="name-asc">Nome (A-Z)</option>
-                    </select>
-                </div>
-            </div>
-            
-            <div class="flex items-center justify-between text-xs text-slate-400 pt-1 border-t border-slate-800/60">
-                <p id="resultsCountText">Exibindo resultados...</p>
-                <p class="hidden sm:block text-slate-400 flex items-center gap-1">
-                    <i class="fa-solid fa-shield-halved text-emerald-400"></i> Proteção Anti-Ban: Trava de 1 min ativa + Rotação de texto IA
-                </p>
-            </div>
-        </section>
-
-        <div id="loadingIndicator" class="hidden py-16 text-center space-y-4">
-            <div class="inline-block animate-spin rounded-full h-12 w-12 border-4 border-purple-500 border-t-transparent"></div>
-            <div class="space-y-1">
-                <p class="text-base font-semibold text-white">🔎 Buscando estabelecimentos no mapa...</p>
-                <p class="text-xs text-slate-400">Extraindo empresas, telefones e avaliações...</p>
-            </div>
+        <!-- INDICADOR DE CARREGAMENTO -->
+        <div id="loadingIndicator" class="hidden py-12 text-center space-y-3">
+            <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-purple-500 border-t-transparent"></div>
+            <p class="text-sm font-medium text-slate-300">Buscando estabelecimentos em tempo real no Google Maps...</p>
         </div>
 
-        <section id="leadsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        </section>
-
+        <section id="leadsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></section>
     </main>
 
+    <!-- MODAL DE PITCH COM TRAVA ANTI-BAN -->
     <div id="copyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <button id="closeCopyModal" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-            
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-lg w-full p-6 space-y-4 shadow-2xl relative">
+            <button id="closeCopyModal" class="absolute top-4 right-4 text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+
             <div class="space-y-1">
-                <div class="flex items-center justify-between">
-                    <span class="text-xs font-bold uppercase tracking-wider text-purple-400 flex items-center gap-1">
-                        <i class="fa-solid fa-code"></i> Pitch Programador Dev
-                    </span>
-                    <span id="siteStatusBadge" class="text-[10px] px-2 py-0.5 rounded font-medium border">
-                        Verificando Site...
-                    </span>
-                </div>
                 <h3 id="modalLeadName" class="text-lg font-bold text-white">Nome da Empresa</h3>
+                <span id="siteStatusBadge" class="text-[10px] px-2 py-0.5 rounded font-medium border"></span>
             </div>
 
             <div class="space-y-1">
-                <label class="text-xs font-semibold text-slate-400">Ângulo da Abordagem:</label>
-                <select id="pitchTemplateSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none focus:border-purple-500">
-                    <option value="redesign">🎨 Redesign Visual + Mobile (Foco em Enviar Portfólio)</option>
-                    <option value="whatsapp">💬 Otimização de Conversão para WhatsApp</option>
-                    <option value="novo">🚀 Criação de Site do Zero (Sem Exigir Vídeo)</option>
+                <label class="text-xs font-semibold text-slate-400">Estratégia de Abordagem IA</label>
+                <select id="pitchTemplateSelect" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-2.5 text-xs text-slate-200 focus:outline-none">
+                    <option value="diagnostico">📉 Diagnóstico Mobile + Oferta de Otimização</option>
+                    <option value="amostra">🎨 Proposta de Melhoria de Design e Performance</option>
+                    <option value="impacto">💰 Perda de Clientes por Lentidão Mobile</option>
                 </select>
             </div>
 
             <div class="space-y-2">
-                <div class="flex items-center justify-between">
-                    <label class="text-xs font-semibold text-slate-400 flex items-center gap-1">
-                        Mensagem Gerada (Anti-Ban):
-                        <span class="text-[10px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded font-mono">100% Única</span>
-                    </label>
-                    <button id="regenerateVariationBtn" class="text-[11px] text-purple-400 hover:text-purple-300 font-medium flex items-center space-x-1">
-                        <i class="fa-solid fa-dice text-amber-400"></i>
-                        <span>🎲 Variar Texto (Anti-Ban)</span>
-                    </button>
-                </div>
-                <div class="relative">
-                    <textarea id="generatedCopyText" rows="5" readonly class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 focus:outline-none focus:border-purple-500 font-sans leading-relaxed"></textarea>
-                    <div id="aiLoadingOverlay" class="hidden absolute inset-0 bg-slate-950/90 rounded-xl flex items-center justify-center space-x-2 text-purple-400 text-xs font-medium">
-                        <i class="fa-solid fa-circle-notch animate-spin text-base"></i>
-                        <span>Gerando variação inédita pela IA...</span>
-                    </div>
-                </div>
+                <textarea id="generatedCopyText" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-sans leading-relaxed focus:outline-none"></textarea>
             </div>
 
-            <div id="cooldownNotice" class="hidden bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 text-xs text-amber-300 space-y-2">
-                <div class="flex items-center justify-between">
-                    <span class="font-bold text-amber-200 flex items-center gap-1.5">
-                        <i class="fa-solid fa-hourglass-half animate-spin text-amber-400"></i> Trava Anti-Ban Ativa
-                    </span>
-                    <span id="cooldownTimerText" class="font-mono text-sm font-bold text-amber-400 bg-amber-500/20 px-2.5 py-0.5 rounded border border-amber-500/30">01:00</span>
-                </div>
-                <p class="text-[11px] text-slate-300 leading-tight">
-                    <strong>⏱️ O contador previne bloqueios:</strong> O intervalo de 1 minuto cadencia os envios como uma pessoa real, protegendo seu número no WhatsApp contra banimentos por envio em massa.
-                </p>
-                <div class="flex items-center justify-between pt-1 border-t border-amber-500/20 mt-1">
-                    <span class="text-[10px] text-amber-300/80">O número testado não era WhatsApp?</span>
-                    <button type="button" id="resetCooldownBtn" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 px-2.5 py-1 rounded text-[11px] font-semibold transition flex items-center gap-1">
-                        <i class="fa-solid fa-rotate-left text-[10px]"></i> Zerar tempo agora
-                    </button>
-                </div>
-            </div>
-
-            <div class="bg-slate-950 border border-slate-800/80 rounded-xl p-3 text-[11px] text-slate-400 flex items-start space-x-2">
-                <i class="fa-solid fa-shield-halved text-emerald-400 mt-0.5 text-xs shrink-0"></i>
-                <p><strong>Segurança Dupla:</strong> Além da variação de texto por IA, o contador cadenciado protege seu chip contra algoritmos do WhatsApp.</p>
-            </div>
-
-            <div class="flex items-center space-x-3 pt-1">
-                <button id="copyTextBtn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium py-2.5 rounded-xl text-xs transition border border-slate-700 flex items-center justify-center space-x-2">
-                    <i class="fa-solid fa-copy"></i>
-                    <span>Copiar Texto</span>
+            <!-- STATUS DA TRAVA ANTI-BAN -->
+            <div id="cooldownStatus" class="hidden text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 p-2.5 rounded-xl flex items-center justify-between font-medium">
+                <span class="flex items-center gap-1.5">
+                    <i class="fa-solid fa-shield-halved text-amber-400"></i>
+                    <span>Trava Anti-Ban: aguarde <b id="cooldownTimer">60s</b></span>
+                </span>
+                <button id="skipCooldownBtn" type="button" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1">
+                    <i class="fa-solid fa-bolt"></i> Pular Trava
                 </button>
-                <a id="openWhatsappLink" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2.5 rounded-xl text-xs transition flex items-center justify-center space-x-2">
-                    <i class="fa-brands fa-whatsapp text-base"></i>
-                    <span>Abrir WhatsApp</span>
+            </div>
+
+            <div class="flex items-center space-x-3 pt-2">
+                <button id="copyTextBtn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-xl text-xs border border-slate-700 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-copy"></i> Copiar Texto
+                </button>
+                <a id="openWhatsappLink" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition">
+                    <i class="fa-brands fa-whatsapp text-base"></i> Abrir WhatsApp
                 </a>
             </div>
         </div>
     </div>
 
-    <div id="apiKeyModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
-            <button id="closeApiKeyModal" class="absolute top-4 right-4 text-slate-400 hover:text-white">
-                <i class="fa-solid fa-xmark text-lg"></i>
-            </button>
-            <div class="space-y-1">
-                <h3 class="text-base font-bold text-white flex items-center gap-2">
-                    <i class="fa-solid fa-key text-amber-400"></i> Chave da API Google Gemini (Opcional)
-                </h3>
-                <p class="text-xs text-slate-400 leading-relaxed">
-                    Com a Chave Gemini, o sistema utiliza Inteligência Artificial avançada para reescrever as abordagens. Caso contrário, ele usa o motor Spintax local.
-                </p>
-            </div>
-            <div class="space-y-1">
-                <input type="password" id="geminiApiKeyInput" placeholder="Cole sua API Key do Gemini (AIzaSy...)" 
-                    class="w-full bg-slate-950 border border-slate-800 rounded-xl py-2.5 px-3 text-xs text-slate-100 placeholder-slate-600 focus:outline-none focus:border-purple-500">
-            </div>
-            <div class="flex justify-end space-x-2 pt-2">
-                <button id="saveApiKeyBtn" class="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-xl text-xs font-semibold transition">
-                    Salvar Chave
-                </button>
-            </div>
-        </div>
-    </div>
-
+    <!-- SCRIPT PRINCIPAL -->
     <script>
-        // Funções auxiliares para leitura segura de armazenamento sem travar em sandboxes de iFrame
-        function safeGetStorage(key, fallback = '') {
-            try {
-                return localStorage.getItem(key) || fallback;
-            } catch (e) {
-                return fallback;
-            }
-        }
+        const NICHOS_VARIADOS = [
+            "Pizzaria e Delivery",
+            "Hamburgueria Artesanal",
+            "Restaurante e Gastronomia",
+            "Barbearia e Salão de Beleza",
+            "Pet Shop e Clínica Veterinária",
+            "Clínica de Estética Avançada",
+            "Dermatologia e Odontologia Estética",
+            "Cirurgia Plástica",
+            "Escritório de Advocacia",
+            "Consultoria Financeira",
+            "Arquitetura e Design de Interiores",
+            "Energia Solar e Automação Residencial",
+            "Imobiliária e Corretor de Imóveis",
+            "Academia e Studio de Pilates",
+            "Curso Técnico e Especializações",
+            "Oficina Mecânica Frotas e Linha Pesada",
+            "Assistência Técnica Especializada",
+            "Autoescola e Centro de Condutores",
+            "Fotografia e Casa de Festas"
+        ];
 
-        function safeSetStorage(key, value) {
-            try {
-                localStorage.setItem(key, value);
-            } catch (e) {
-                // Modo silencioso em iFrames restritos
-            }
-        }
+        const CIDADES_POPULARES = [
+            "Rio de Janeiro, RJ",
+            "São Paulo, SP",
+            "Belo Horizonte, MG",
+            "Curitiba, PR",
+            "Brasília, DF",
+            "Campinas, SP",
+            "Niterói, RJ",
+            "Porto Alegre, RS",
+            "Salvador, BA",
+            "Recife, PE"
+        ];
 
         let currentLeads = [];
-        let filteredLeads = [];
-        let activeFilter = 'all';
         let currentActiveLead = null;
-        let userGeminiKey = safeGetStorage('gemini_api_key', '');
-
-        let cooldownEndTime = parseInt(safeGetStorage('leadHunter_cooldownEnd', '0'), 10);
-        let cooldownTimerId = null;
-
-        const defaultDemoLeads = [
-            { id: 1, name: "Otaviano Carvalho Advogados", niche: "Advogados", phone: "(21) 98823-4112", cleanPhone: "5521988234112", website: "https://otaviano.com.br", rating: 4.8, reviews: 42, address: "Av. Rio Branco, 156 - Centro, Rio de Janeiro", status: "novo", isSaved: true },
-            { id: 2, name: "Contabilidade Express RJ", niche: "Contabilidade", phone: "(21) 99120-8844", cleanPhone: "5521991208844", website: null, rating: 4.5, reviews: 19, address: "Rua do Ouvidor, 60 - Centro, Rio de Janeiro", status: "novo", isSaved: false },
-            { id: 3, name: "Hamburgueria Artesanal Barra", niche: "Hamburguerias", phone: "(21) 97112-9900", cleanPhone: "5521971129900", website: "https://hamburgueriabarra.com.br", rating: 4.9, reviews: 128, address: "Av. das Américas, 4200 - Barra da Tijuca", status: "contatado", isSaved: false },
-            { id: 4, name: "Odonto Clean Clínica", niche: "Dentistas", phone: "(21) 98102-3344", cleanPhone: "5521981023344", website: null, rating: 4.2, reviews: 15, address: "Rua Conde de Bonfim, 300 - Tijuca", status: "novo", isSaved: false }
-        ];
-
-        const citiesDatabase = [
-            "Rio de Janeiro, RJ", "Niterói, RJ", "Duque de Caxias, RJ", "Nova Iguaçu, RJ", "São Gonçalo, RJ",
-            "Petrópolis, RJ", "Campos dos Goytacazes, RJ", "Volta Redonda, RJ", "São Paulo, SP", "Campinas, SP",
-            "Santos, SP", "São José dos Campos, SP", "Ribeirão Preto, SP", "Belo Horizonte, MG", "Juiz de Fora, MG",
-            "Uberlândia, MG", "Curitiba, PR", "Florianópolis, SC", "Porto Alegre, RS", "Brasília, DF",
-            "Goiânia, GO", "Salvador, BA", "Fortaleza, CE", "Recife, PE", "Manaus, AM", "Belém, PA", "Vitória, ES"
-        ];
-
-        const nichesDatabase = [
-            "Contabilidade", "Hamburguerias", "Advogados", "Lanchonetes", "Dentistas", "Restaurantes", "Salões de Beleza",
-            "Oficinas Mecânicas", "Clínicas Médicas", "Imobiliárias", "Pet Shops", "Academias", "Barbearias",
-            "Escolas de Idiomas", "Empresas de Energia Solar"
-        ];
-
-        let searchForm, nicheInput, locationInput, nicheSuggestions, locationSuggestions;
-        let leadsContainer, loadingIndicator, resultsCountText, internalSearch, sortSelect;
-        let copyModal, closeCopyModal, modalLeadName, siteStatusBadge, pitchTemplateSelect, generatedCopyText, aiLoadingOverlay, copyTextBtn, openWhatsappLink, regenerateVariationBtn, resetCooldownBtn;
-        let apiKeyModal, openApiKeyModal, closeApiKeyModal, geminiApiKeyInput, saveApiKeyBtn, exportCsvBtn;
-
-        function saveLeadsToStorage() {
-            safeSetStorage('leadHunter_saved_leads', JSON.stringify(currentLeads));
-        }
-
-        function loadLeadsFromStorage() {
-            const stored = safeGetStorage('leadHunter_saved_leads', '');
-            if (stored) {
-                try {
-                    currentLeads = JSON.parse(stored);
-                } catch (e) {
-                    currentLeads = [...defaultDemoLeads];
-                }
-            } else {
-                currentLeads = [...defaultDemoLeads];
-                saveLeadsToStorage();
-            }
-        }
+        let cooldownInterval = null;
 
         function initApp() {
-            searchForm = document.getElementById('searchForm');
-            nicheInput = document.getElementById('nicheInput');
-            locationInput = document.getElementById('locationInput');
-            nicheSuggestions = document.getElementById('nicheSuggestions');
-            locationSuggestions = document.getElementById('locationSuggestions');
-            
-            leadsContainer = document.getElementById('leadsContainer');
-            loadingIndicator = document.getElementById('loadingIndicator');
-            resultsCountText = document.getElementById('resultsCountText');
-            internalSearch = document.getElementById('internalSearch');
-            sortSelect = document.getElementById('sortSelect');
+            setupDropdownMenu(document.getElementById('nicheInput'), document.getElementById('nicheSuggestions'), document.getElementById('btnToggleNiche'), NICHOS_VARIADOS);
+            setupDropdownMenu(document.getElementById('locationInput'), document.getElementById('locationSuggestions'), document.getElementById('btnToggleLocation'), CIDADES_POPULARES);
 
-            copyModal = document.getElementById('copyModal');
-            closeCopyModal = document.getElementById('closeCopyModal');
-            modalLeadName = document.getElementById('modalLeadName');
-            siteStatusBadge = document.getElementById('siteStatusBadge');
-            pitchTemplateSelect = document.getElementById('pitchTemplateSelect');
-            generatedCopyText = document.getElementById('generatedCopyText');
-            aiLoadingOverlay = document.getElementById('aiLoadingOverlay');
-            copyTextBtn = document.getElementById('copyTextBtn');
-            openWhatsappLink = document.getElementById('openWhatsappLink');
-            regenerateVariationBtn = document.getElementById('regenerateVariationBtn');
-            resetCooldownBtn = document.getElementById('resetCooldownBtn');
+            document.getElementById('searchForm').addEventListener('submit', handleSearchSubmit);
+            document.getElementById('closeCopyModal').addEventListener('click', () => document.getElementById('copyModal').classList.add('hidden'));
+            document.getElementById('pitchTemplateSelect').addEventListener('change', updateCopyTextWithIA);
 
-            apiKeyModal = document.getElementById('apiKeyModal');
-            openApiKeyModal = document.getElementById('openApiKeyModal');
-            closeApiKeyModal = document.getElementById('closeApiKeyModal');
-            geminiApiKeyInput = document.getElementById('geminiApiKeyInput');
-            saveApiKeyBtn = document.getElementById('saveApiKeyBtn');
-            exportCsvBtn = document.getElementById('exportCsvBtn');
-
-            if (nicheInput) nicheInput.value = "Contabilidade";
-            if (locationInput) locationInput.value = "Rio de Janeiro, RJ";
-            if (geminiApiKeyInput) geminiApiKeyInput.value = userGeminiKey;
-
-            if (locationInput && locationSuggestions) setupAutocomplete(locationInput, locationSuggestions, citiesDatabase, 'fa-map-pin');
-            if (nicheInput && nicheSuggestions) setupAutocomplete(nicheInput, nicheSuggestions, nichesDatabase, 'fa-briefcase');
-
-            loadLeadsFromStorage();
-            applyFilter();
-
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    document.querySelectorAll('.filter-btn').forEach(b => {
-                        b.classList.remove('bg-brand-600', 'text-white');
-                        b.classList.add('bg-slate-900', 'text-slate-300');
-                    });
-                    const target = e.currentTarget;
-                    target.classList.remove('bg-slate-900', 'text-slate-300');
-                    target.classList.add('bg-brand-600', 'text-white');
-
-                    activeFilter = target.getAttribute('data-filter');
-                    applyFilter();
-                });
+            document.getElementById('copyTextBtn').addEventListener('click', () => {
+                navigator.clipboard.writeText(document.getElementById('generatedCopyText').value);
+                alert('Mensagem copiada para a área de transferência!');
             });
 
-            if (internalSearch) internalSearch.addEventListener('input', applyFilter);
-            if (sortSelect) sortSelect.addEventListener('change', applyFilter);
-            if (pitchTemplateSelect) pitchTemplateSelect.addEventListener('change', updateCopyTextWithIA);
-            if (regenerateVariationBtn) regenerateVariationBtn.addEventListener('click', updateCopyTextWithIA);
+            document.getElementById('openWhatsappLink').addEventListener('click', (e) => {
+                if (isCooldownActive()) {
+                    e.preventDefault();
+                    alert('Aguarde a trava Anti-Ban zerar ou clique em "Pular Trava"!');
+                    return;
+                }
+                startAntiBanCooldown();
+            });
 
-            if (openApiKeyModal) openApiKeyModal.addEventListener('click', () => apiKeyModal.classList.remove('hidden'));
-            if (closeApiKeyModal) closeApiKeyModal.addEventListener('click', () => apiKeyModal.classList.add('hidden'));
-            if (closeCopyModal) closeCopyModal.addEventListener('click', () => copyModal.classList.add('hidden'));
+            document.getElementById('skipCooldownBtn').addEventListener('click', resetAntiBanCooldown);
 
-            if (saveApiKeyBtn) {
-                saveApiKeyBtn.addEventListener('click', () => {
-                    userGeminiKey = geminiApiKeyInput.value.trim();
-                    safeSetStorage('gemini_api_key', userGeminiKey);
-                    apiKeyModal.classList.add('hidden');
-                    alert('Chave de API salva com sucesso!');
-                });
-            }
-
-            if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportToCSV);
-
-            if (copyTextBtn) {
-                copyTextBtn.addEventListener('click', () => {
-                    navigator.clipboard.writeText(generatedCopyText.value);
-                    copyTextBtn.innerHTML = `<i class="fa-solid fa-check text-emerald-400"></i> <span>Copiado!</span>`;
-                    setTimeout(() => {
-                        copyTextBtn.innerHTML = `<i class="fa-solid fa-copy"></i> <span>Copiar Texto</span>`;
-                    }, 2000);
-                });
-            }
-
-            if (openWhatsappLink) {
-                openWhatsappLink.addEventListener('click', (e) => {
-                    const now = Date.now();
-                    if (cooldownEndTime > now) {
-                        e.preventDefault();
-                        return;
-                    }
-                    
-                    if (currentActiveLead) {
-                        currentActiveLead.status = 'contatado';
-                        saveLeadsToStorage();
-                        applyFilter();
-                    }
-
-                    startCooldownTimer(60);
-                });
-            }
-
-            if (resetCooldownBtn) {
-                resetCooldownBtn.addEventListener('click', () => {
-                    cooldownEndTime = 0;
-                    safeSetStorage('leadHunter_cooldownEnd', '0');
-                    if (cooldownTimerId) {
-                        clearInterval(cooldownTimerId);
-                        cooldownTimerId = null;
-                    }
-                    updateCooldownUI(0);
-                });
-            }
-
-            if (searchForm) searchForm.addEventListener('submit', handleSearchSubmit);
-
-            checkCooldownState();
+            checkCooldownOnLoad();
+            fetchLeadsTempoReal();
+            setInterval(fetchLeadsTempoReal, 8000);
         }
 
-        function generateMockLeads(niche, location) {
-            const cityShort = location.split(',')[0].trim();
-            const cleanNicheName = niche.charAt(0).toUpperCase() + niche.slice(1);
-            
-            return [
-                { id: Date.now() + 1, name: `${cleanNicheName} ${cityShort} Prime`, niche: niche, phone: "(21) 98823-4112", cleanPhone: "5521988234112", website: `https://${niche.toLowerCase().replace(/\s+/g, '')}prime.com.br`, rating: 4.8, reviews: 42, address: `Av. Principal, 150 - ${cityShort}`, status: "novo", isSaved: false },
-                { id: Date.now() + 2, name: `${cleanNicheName} Express ${cityShort}`, niche: niche, phone: "(21) 99120-8844", cleanPhone: "5521991208844", website: null, rating: 4.5, reviews: 19, address: `Rua das Flores, 60 - ${cityShort}`, status: "novo", isSaved: false },
-                { id: Date.now() + 3, name: `Grupo ${cleanNicheName} ${cityShort}`, niche: niche, phone: "(21) 97112-9900", cleanPhone: "5521971129900", website: `https://grupo${niche.toLowerCase().replace(/\s+/g, '')}.com.br`, rating: 4.9, reviews: 128, address: `Av. Central, 1200 - ${cityShort}`, status: "novo", isSaved: false },
-                { id: Date.now() + 4, name: `Centro de ${cleanNicheName} ${cityShort}`, niche: niche, phone: "(21) 98102-3344", cleanPhone: "5521981023344", website: null, rating: 4.2, reviews: 15, address: `Rua do Comércio, 300 - ${cityShort}`, status: "novo", isSaved: false },
-                { id: Date.now() + 5, name: `${cleanNicheName} & Associados`, niche: niche, phone: "(21) 99233-1100", cleanPhone: "5521992331100", website: null, rating: 4.7, reviews: 31, address: `Rua São Pedro, 88 - ${cityShort}`, status: "novo", isSaved: false }
-            ];
-        }
-
-        function startCooldownTimer(seconds = 60) {
-            cooldownEndTime = Date.now() + (seconds * 1000);
-            safeSetStorage('leadHunter_cooldownEnd', cooldownEndTime.toString());
-            runCooldownTicker();
-        }
-
-        function checkCooldownState() {
-            if (cooldownEndTime > Date.now()) {
-                runCooldownTicker();
-            } else {
-                updateCooldownUI(0);
+        function setupDropdownMenu(input, container, toggleBtn, dataset) {
+            function renderItems(items) {
+                container.innerHTML = '';
+                if (items.length === 0) {
+                    container.classList.add('hidden');
+                    return;
+                }
+                items.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'px-4 py-2.5 text-xs text-slate-200 hover:bg-slate-800 hover:text-purple-400 cursor-pointer transition flex items-center justify-between';
+                    div.innerHTML = `<span>${item}</span> <i class="fa-solid fa-angle-right text-[10px] opacity-40"></i>`;
+                    div.onclick = () => {
+                        input.value = item;
+                        container.classList.add('hidden');
+                    };
+                    container.appendChild(div);
+                });
+                container.classList.remove('hidden');
             }
-        }
 
-        function runCooldownTicker() {
-            if (cooldownTimerId) clearInterval(cooldownTimerId);
-
-            function tick() {
-                const remainingMs = cooldownEndTime - Date.now();
-                if (remainingMs <= 0) {
-                    clearInterval(cooldownTimerId);
-                    cooldownTimerId = null;
-                    updateCooldownUI(0);
+            input.addEventListener('focus', () => renderItems(dataset));
+            toggleBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (container.classList.contains('hidden')) {
+                    renderItems(dataset);
                 } else {
-                    const remainingSec = Math.ceil(remainingMs / 1000);
-                    updateCooldownUI(remainingSec);
+                    container.classList.add('hidden');
                 }
-            }
+            });
 
-            tick();
-            cooldownTimerId = setInterval(tick, 1000);
-        }
-
-        function updateCooldownUI(remainingSec) {
-            const cooldownNotice = document.getElementById('cooldownNotice');
-            const cooldownTimerText = document.getElementById('cooldownTimerText');
-
-            if (remainingSec > 0) {
-                if (cooldownNotice) cooldownNotice.classList.remove('hidden');
-                if (cooldownTimerText) {
-                    const mins = String(Math.floor(remainingSec / 60)).padStart(2, '0');
-                    const secs = String(remainingSec % 60).padStart(2, '0');
-                    cooldownTimerText.innerText = `${mins}:${secs}`;
-                }
-                if (openWhatsappLink) {
-                    openWhatsappLink.classList.add('pointer-events-none', 'opacity-50', 'bg-slate-800');
-                    openWhatsappLink.classList.remove('bg-emerald-600', 'hover:bg-emerald-500');
-                    openWhatsappLink.innerHTML = `<i class="fa-solid fa-lock text-amber-400"></i> <span>Aguarde (${remainingSec}s)</span>`;
-                }
-            } else {
-                if (cooldownNotice) cooldownNotice.classList.add('hidden');
-                if (openWhatsappLink) {
-                    openWhatsappLink.classList.remove('pointer-events-none', 'opacity-50', 'bg-slate-800');
-                    openWhatsappLink.classList.add('bg-emerald-600', 'hover:bg-emerald-500');
-                    openWhatsappLink.innerHTML = `<i class="fa-brands fa-whatsapp text-base"></i> <span>Abrir WhatsApp</span>`;
-                }
-            }
-        }
-
-        function setupAutocomplete(inputElement, suggestionsElement, dataset, iconClass) {
-            inputElement.addEventListener('input', () => {
-                const query = inputElement.value.trim().toLowerCase();
-                suggestionsElement.innerHTML = '';
-
-                if (!query) {
-                    suggestionsElement.classList.add('hidden');
-                    return;
-                }
-
-                const matches = dataset.filter(item => item.toLowerCase().includes(query));
-                if (matches.length === 0) {
-                    suggestionsElement.classList.add('hidden');
-                    return;
-                }
-
-                matches.forEach(item => {
-                    const itemDiv = document.createElement('div');
-                    itemDiv.className = "px-4 py-2.5 text-sm text-slate-200 hover:bg-slate-800 hover:text-brand-400 cursor-pointer flex items-center space-x-2 transition";
-                    itemDiv.innerHTML = `<i class="fa-solid ${iconClass} text-xs text-slate-500"></i> <span>${item}</span>`;
-                    
-                    itemDiv.addEventListener('click', () => {
-                        inputElement.value = item;
-                        suggestionsElement.classList.add('hidden');
-                    });
-
-                    suggestionsElement.appendChild(itemDiv);
-                });
-
-                suggestionsElement.classList.remove('hidden');
+            input.addEventListener('input', () => {
+                const query = input.value.toLowerCase().trim();
+                const filtered = dataset.filter(i => i.toLowerCase().includes(query));
+                renderItems(filtered);
             });
 
             document.addEventListener('click', (e) => {
-                if (!inputElement.contains(e.target) && !suggestionsElement.contains(e.target)) {
-                    suggestionsElement.classList.add('hidden');
+                if (!input.contains(e.target) && !container.contains(e.target) && !toggleBtn.contains(e.target)) {
+                    container.classList.add('hidden');
                 }
             });
+        }
+
+        function startAntiBanCooldown() {
+            const cooldownMs = 60 * 1000;
+            const endTime = Date.now() + cooldownMs;
+            localStorage.setItem('wa_cooldown_end', endTime);
+            updateCooldownUI();
+        }
+
+        function resetAntiBanCooldown() {
+            localStorage.removeItem('wa_cooldown_end');
+            if (cooldownInterval) clearInterval(cooldownInterval);
+            cooldownInterval = null;
+            document.getElementById('cooldownStatus').classList.add('hidden');
+            document.getElementById('openWhatsappLink').classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
+        function isCooldownActive() {
+            const endTime = parseInt(localStorage.getItem('wa_cooldown_end') || '0', 10);
+            return Date.now() < endTime;
+        }
+
+        function checkCooldownOnLoad() {
+            if (isCooldownActive()) {
+                updateCooldownUI();
+            }
+        }
+
+        function updateCooldownUI() {
+            const statusBox = document.getElementById('cooldownStatus');
+            const timerLabel = document.getElementById('cooldownTimer');
+            const waBtn = document.getElementById('openWhatsappLink');
+
+            if (cooldownInterval) clearInterval(cooldownInterval);
+
+            cooldownInterval = setInterval(() => {
+                const endTime = parseInt(localStorage.getItem('wa_cooldown_end') || '0', 10);
+                const remainingSecs = Math.ceil((endTime - Date.now()) / 1000);
+
+                if (remainingSecs > 0) {
+                    statusBox.classList.remove('hidden');
+                    timerLabel.innerText = `${remainingSecs}s`;
+                    waBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                } else {
+                    resetAntiBanCooldown();
+                }
+            }, 1000);
+        }
+
+        async function fetchLeadsTempoReal() {
+            try {
+                const res = await fetch('/api/leads-tempo-real');
+                const data = await res.json();
+                if (data.success && data.leads) {
+                    currentLeads = data.leads;
+                    renderLeads();
+                    updateStats();
+                }
+            } catch (e) {
+                console.warn('Servidor Python desconectado.');
+            }
         }
 
         async function handleSearchSubmit(e) {
             e.preventDefault();
-            const niche = nicheInput.value.trim();
-            const location = locationInput.value.trim();
+            const niche = document.getElementById('nicheInput').value;
+            const location = document.getElementById('locationInput').value;
 
-            if (!niche || !location) return;
-
-            loadingIndicator.classList.remove('hidden');
-            leadsContainer.innerHTML = '';
-            resultsCountText.innerText = "Buscando estabelecimentos...";
+            document.getElementById('loadingIndicator').classList.remove('hidden');
 
             try {
-                const response = await fetch('/api/buscar', {
+                const res = await fetch('/api/buscar', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ niche, location })
                 });
-
-                const data = await response.json();
-                loadingIndicator.classList.add('hidden');
-
-                if (data.success && data.leads && data.leads.length > 0) {
+                const data = await res.json();
+                if (data.success) {
                     currentLeads = data.leads;
-                    saveLeadsToStorage();
-                    applyFilter();
-                    return;
+                    renderLeads();
+                    updateStats();
                 }
             } catch (err) {
-                console.warn("Servidor Python local não conectado. Carregando dados do simulador interno.");
+                alert('Erro na busca. Certifique-se de que o servidor Python está rodando!');
+            } finally {
+                document.getElementById('loadingIndicator').classList.add('hidden');
             }
-
-            setTimeout(() => {
-                loadingIndicator.classList.add('hidden');
-                currentLeads = generateMockLeads(niche, location);
-                saveLeadsToStorage();
-                applyFilter();
-            }, 600);
         }
 
-        function applyFilter() {
-            let list = [...currentLeads];
-
-            if (activeFilter === 'no-website') {
-                list = list.filter(l => !l.website);
-            } else if (activeFilter === 'has-website') {
-                list = list.filter(l => !!l.website);
-            } else if (activeFilter === 'contacted') {
-                list = list.filter(l => l.status === 'contatado');
-            }
-
-            if (internalSearch) {
-                const query = internalSearch.value.trim().toLowerCase();
-                if (query) {
-                    list = list.filter(l => l.name.toLowerCase().includes(query));
-                }
-            }
-
-            if (sortSelect) {
-                const sortVal = sortSelect.value;
-                if (sortVal === 'rating-desc') {
-                    list.sort((a, b) => b.rating - a.rating);
-                } else if (sortVal === 'reviews-desc') {
-                    list.sort((a, b) => b.reviews - a.reviews);
-                } else if (sortVal === 'name-asc') {
-                    list.sort((a, b) => a.name.localeCompare(b.name));
-                }
-            }
-
-            filteredLeads = list;
-            renderLeads();
-            updateStats();
-        }
-
+        // RENDERIZAÇÃO DOS CARDS (COM EXIBIÇÃO DO SITE)
         function renderLeads() {
-            if (!leadsContainer) return;
-            leadsContainer.innerHTML = '';
-            if (resultsCountText) {
-                resultsCountText.innerText = `Exibindo ${filteredLeads.length} de ${currentLeads.length} leads`;
-            }
+            const container = document.getElementById('leadsContainer');
+            container.innerHTML = '';
 
-            if (filteredLeads.length === 0) {
-                leadsContainer.innerHTML = `
-                    <div class="col-span-full py-12 text-center text-slate-500 space-y-2">
-                        <i class="fa-solid fa-folder-open text-3xl"></i>
-                        <p class="text-sm font-medium">Nenhum lead encontrado com estes filtros.</p>
-                    </div>
-                `;
-                return;
-            }
-
-            filteredLeads.forEach(lead => {
+            currentLeads.forEach(lead => {
                 const card = document.createElement('div');
-                card.className = "bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between space-y-4 hover:border-slate-700 transition shadow-lg relative group";
+                card.className = 'bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between space-y-3';
                 
                 const hasSite = !!lead.website;
-                const siteBadge = hasSite 
-                    ? `<span class="inline-flex items-center text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20"><i class="fa-solid fa-check text-[9px] mr-1"></i> Com Site (Oferecer Redesign)</span>`
-                    : `<span class="inline-flex items-center text-[10px] font-semibold bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded border border-rose-500/20"><i class="fa-solid fa-triangle-exclamation text-[9px] mr-1"></i> Sem Site (Criar do Zero)</span>`;
+                const badge = hasSite 
+                    ? `<span class="text-[10px] bg-emerald-500/10 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/20 font-medium">Com Site (Redesign 🎨)</span>`
+                    : `<span class="text-[10px] bg-rose-500/10 text-rose-400 px-2 py-0.5 rounded border border-rose-500/20 font-medium">Sem Site (Criar do Zero 🔥)</span>`;
+
+                const websiteDisplay = hasSite 
+                    ? `<a href="${lead.website}" target="_blank" class="text-brand-400 hover:underline flex items-center gap-1"><i class="fa-solid fa-globe text-slate-500"></i> ${lead.website.replace(/^https?:\/\//, '')}</a>` 
+                    : `<span class="text-slate-500 flex items-center gap-1"><i class="fa-solid fa-globe text-slate-600"></i> Sem site cadastrado</span>`;
 
                 card.innerHTML = `
-                    <div class="space-y-2">
-                        <div class="flex items-start justify-between gap-2">
-                            <h4 class="text-sm font-bold text-white line-clamp-1 group-hover:text-brand-400 transition">${lead.name}</h4>
-                            <button onclick="toggleSaveLead(${lead.id})" class="text-slate-600 hover:text-amber-400 transition">
-                                <i class="${lead.isSaved ? 'fa-solid text-amber-400' : 'fa-regular'} fa-bookmark"></i>
-                            </button>
+                    <div class="space-y-1.5">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-sm font-bold text-white line-clamp-1">${lead.name}</h4>
                         </div>
-                        
-                        <div class="flex items-center space-x-2">
-                            ${siteBadge}
-                        </div>
-
-                        <div class="space-y-1 text-xs text-slate-400 pt-1">
-                            <p class="flex items-center"><i class="fa-solid fa-star text-amber-400 mr-1.5 text-[10px]"></i> <strong class="text-slate-200 mr-1">${lead.rating}</strong> (${lead.reviews} avaliações)</p>
-                            <p class="flex items-center"><i class="fa-solid fa-phone text-slate-500 mr-1.5 text-[10px]"></i> ${lead.phone}</p>
-                            <p class="flex items-center line-clamp-1"><i class="fa-solid fa-location-dot text-slate-500 mr-1.5 text-[10px]"></i> ${lead.address}</p>
+                        <div>${badge}</div>
+                        <div class="text-xs text-slate-400 space-y-1 pt-1">
+                            <p><i class="fa-solid fa-star text-amber-400 mr-1"></i> ${lead.rating} (${lead.reviews} avaliações)</p>
+                            <p><i class="fa-solid fa-phone text-slate-500 mr-1"></i> ${lead.phone || 'Não informado'}</p>
+                            <p class="line-clamp-1">${websiteDisplay}</p>
+                            <p class="line-clamp-1"><i class="fa-solid fa-location-dot text-slate-500 mr-1"></i> ${lead.address}</p>
                         </div>
                     </div>
-
-                    <div class="flex items-center space-x-2 pt-2 border-t border-slate-800/80">
-                        <select onchange="updateLeadStatus(${lead.id}, this.value)" class="bg-slate-950 border border-slate-800 text-[11px] text-slate-300 rounded-lg py-1.5 px-2 focus:outline-none">
-                            <option value="novo" ${lead.status === 'novo' ? 'selected' : ''}>🟢 Novo</option>
-                            <option value="contatado" ${lead.status === 'contatado' ? 'selected' : ''}>🟡 Em Contato</option>
-                            <option value="agendado" ${lead.status === 'agendado' ? 'selected' : ''}>🔵 Reunião</option>
-                            <option value="fechado" ${lead.status === 'fechado' ? 'selected' : ''}>🏆 Fechado</option>
-                        </select>
-
-                        <button onclick="openPitchModal(${lead.id})" class="flex-1 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium py-1.5 px-3 rounded-lg text-xs transition flex items-center justify-center space-x-1.5 shadow-md">
-                            <i class="fa-solid fa-code text-[10px]"></i>
-                            <span>Pitch Dev IA</span>
+                    <div class="pt-2 border-t border-slate-800 flex justify-end">
+                        <button onclick="openPitchModal(${lead.id})" class="w-full bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 text-white font-medium py-2 rounded-xl text-xs flex items-center justify-center gap-1 shadow-md transition">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Gerar Abordagem IA
                         </button>
                     </div>
                 `;
-
-                leadsContainer.appendChild(card);
+                container.appendChild(card);
             });
         }
 
         function updateStats() {
-            const statTotal = document.getElementById('statTotal');
-            const statNoWebsite = document.getElementById('statNoWebsite');
-            const statHasWebsite = document.getElementById('statHasWebsite');
-            const statWon = document.getElementById('statWon');
-
-            if (statTotal) statTotal.innerText = currentLeads.length;
-            if (statNoWebsite) statNoWebsite.innerText = currentLeads.filter(l => !l.website).length;
-            if (statHasWebsite) statHasWebsite.innerText = currentLeads.filter(l => !!l.website).length;
-            if (statWon) statWon.innerText = currentLeads.filter(l => l.status === 'fechado').length;
-        }
-
-        function toggleSaveLead(id) {
-            const lead = currentLeads.find(l => l.id === id);
-            if (lead) {
-                lead.isSaved = !lead.isSaved;
-                saveLeadsToStorage();
-                applyFilter();
-            }
-        }
-
-        function updateLeadStatus(id, newStatus) {
-            const lead = currentLeads.find(l => l.id === id);
-            if (lead) {
-                lead.status = newStatus;
-                saveLeadsToStorage();
-                updateStats();
-            }
+            document.getElementById('statTotal').innerText = currentLeads.length;
+            document.getElementById('statNoWebsite').innerText = currentLeads.filter(l => !l.website).length;
+            document.getElementById('statHasWebsite').innerText = currentLeads.filter(l => !!l.website).length;
+            document.getElementById('statWon').innerText = currentLeads.filter(l => l.status === 'fechado').length;
         }
 
         function openPitchModal(id) {
             currentActiveLead = currentLeads.find(l => l.id === id);
             if (!currentActiveLead) return;
 
-            if (modalLeadName) modalLeadName.innerText = currentActiveLead.name;
-            
-            const hasSite = !!currentActiveLead.website;
-            if (siteStatusBadge) {
-                if (hasSite) {
-                    siteStatusBadge.className = "text-[10px] bg-amber-500/10 text-amber-400 border-amber-500/20 px-2 py-0.5 rounded font-medium border";
-                    siteStatusBadge.innerHTML = `<i class="fa-solid fa-paintbrush mr-1"></i> Com Site (Foco: Modernizar/Portfólio)`;
-                } else {
-                    siteStatusBadge.className = "text-[10px] bg-rose-500/10 text-rose-400 border-rose-500/20 px-2 py-0.5 rounded font-medium border";
-                    siteStatusBadge.innerHTML = `<i class="fa-solid fa-plus-circle mr-1"></i> Sem Site (Foco: Criar do Zero)`;
-                }
-            }
-
-            if (copyModal) copyModal.classList.remove('hidden');
-            checkCooldownState();
+            document.getElementById('modalLeadName').innerText = currentActiveLead.name;
+            document.getElementById('copyModal').classList.remove('hidden');
             updateCopyTextWithIA();
         }
 
+        // NOVO GERADOR DE ABORDAGEM (SEM LOCAL, NOTA E DEMONSTRAÇÃO)
         async function updateCopyTextWithIA() {
             if (!currentActiveLead) return;
 
-            if (aiLoadingOverlay) aiLoadingOverlay.classList.remove('hidden');
-            const objective = pitchTemplateSelect ? pitchTemplateSelect.value : 'redesign';
+            const objective = document.getElementById('pitchTemplateSelect').value;
+            const hasSite = !!currentActiveLead.website;
+
+            let fallbackCopy = "";
+            if (hasSite) {
+                if (objective === 'diagnostico') {
+                    fallbackCopy = `Olá! Dei uma olhada na versão mobile do site da ${currentActiveLead.name} e percebi que a navegação pode ser otimizada para capturar mais contatos. A cada segundo de atraso, cerca de 20% das pessoas desistem antes de chamar.\n\nVocê teria interesse no serviço de melhoria e otimização para o site de vocês?`;
+                } else if (objective === 'amostra') {
+                    fallbackCopy = `Olá! Analisei o site da ${currentActiveLead.name} pelo celular e notei boas oportunidades para aumentar a conversão de novos clientes.\n\nVocê teria interesse em conhecer nosso serviço de reformulação e melhoria para o site de vocês?`;
+                } else {
+                    fallbackCopy = `Olá! Pequenos gargalos na versão mobile do site da ${currentActiveLead.name} podem estar fazendo você perder contatos diariamente para concorrentes.\n\nVocê teria interesse no serviço de otimização para acelerar o site de vocês e converter mais visitantes?`;
+                }
+            } else {
+                fallbackCopy = `Olá! Notei que a ${currentActiveLead.name} ainda não possui um site otimizado para capturar novos clientes vindos da internet.\n\nVocê teria interesse no serviço de criação de site profissional para atração de contatos?`;
+            }
 
             try {
-                const response = await fetch('/api/gerar-pitch-ia', {
+                const res = await fetch('/api/gerar-pitch-ia', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({
                         name: currentActiveLead.name,
-                        niche: currentActiveLead.niche || (nicheInput ? nicheInput.value : 'Empresa'),
-                        location: locationInput ? locationInput.value : 'Rio de Janeiro, RJ',
-                        hasWebsite: !!currentActiveLead.website,
+                        niche: currentActiveLead.niche,
+                        location: currentActiveLead.location,
+                        hasWebsite: hasSite,
                         rating: currentActiveLead.rating,
                         reviews: currentActiveLead.reviews,
-                        objective: objective,
-                        geminiApiKey: userGeminiKey
+                        objective: objective
                     })
                 });
 
-                const data = await response.json();
-                if (aiLoadingOverlay) aiLoadingOverlay.classList.add('hidden');
-
+                const data = await res.json();
                 if (data.success && data.copy) {
-                    if (generatedCopyText) generatedCopyText.value = data.copy;
-                    
-                    if (currentActiveLead.cleanPhone && openWhatsappLink) {
-                        const encodedMsg = encodeURIComponent(data.copy);
-                        openWhatsappLink.href = `https://wa.me/${currentActiveLead.cleanPhone}?text=${encodedMsg}`;
-                    } else if (openWhatsappLink) {
-                        openWhatsappLink.href = "#";
-                    }
-                    return;
+                    document.getElementById('generatedCopyText').value = data.copy;
+                } else {
+                    document.getElementById('generatedCopyText').value = fallbackCopy;
                 }
-            } catch (err) {
-                console.warn("Servidor de IA offline. Utilizando motor Spintax local.");
+            } catch (e) {
+                document.getElementById('generatedCopyText').value = fallbackCopy;
             }
 
-            if (aiLoadingOverlay) aiLoadingOverlay.classList.add('hidden');
-            const fallbackText = generateLocalSpintaxFallback(currentActiveLead);
-            if (generatedCopyText) generatedCopyText.value = fallbackText;
-            if (currentActiveLead.cleanPhone && openWhatsappLink) {
-                const encodedMsg = encodeURIComponent(fallbackText);
-                openWhatsappLink.href = `https://wa.me/${currentActiveLead.cleanPhone}?text=${encodedMsg}`;
+            const copyFinal = document.getElementById('generatedCopyText').value;
+            if (currentActiveLead.clean_phone) {
+                const encodedMsg = encodeURIComponent(copyFinal);
+                document.getElementById('openWhatsappLink').href = `https://wa.me/${currentActiveLead.clean_phone}?text=${encodedMsg}`;
             }
         }
 
-        function generateLocalSpintaxFallback(lead) {
-            const hasSite = !!lead.website;
-            const saudacao = ["Olá!", "Tudo bem?", "Oi, tudo joia?", "Opa, tudo tranquilo?"][Math.floor(Math.random() * 4)];
-            const intro = "Sou desenvolvedor web e programador de sites.";
-            
-            if (hasSite) {
-                const corpo = `Estava pesquisando sobre ${lead.niche || 'empresas'} na região e vi a ótima reputação de vocês no Google (${lead.rating} ⭐). Acessei o site de vocês pelo celular e notei que dá para modernizar o visual e otimizar a estrutura para gerar muito mais contatos no WhatsApp.`;
-                const cta = "Posso te mandar aqui 2 ou 3 exemplos de sites modernos que criei para você ver o estilo sem compromisso?";
-                return `${saudacao} ${intro}\n\n${corpo}\n\n${cta}`;
-            } else {
-                const corpo = `Estava pesquisando sobre ${lead.niche || 'empresas'} no Google Maps e vi que vocês têm ${lead.reviews} avaliações super positivas. Porém, notei que vocês ainda não possuem um site oficial cadastrado no perfil.`;
-                const cta = "Se você quiser, posso te enviar no WhatsApp 2 exemplos do meu portfólio para você ver como ficaria uma página para o seu negócio?";
-                return `${saudacao} ${intro}\n\n${corpo}\n\n${cta}`;
-            }
-        }
-
-        function exportToCSV() {
-            if (currentLeads.length === 0) {
-                alert('Nenhum lead para exportar.');
-                return;
-            }
-
-            let csvContent = "data:text/csv;charset=utf-8,\uFEFF";
-            csvContent += "Nome;Telefone;Possui Site;Site;Nota;Avaliacoes;Endereco;Status\n";
-
-            currentLeads.forEach(l => {
-                const hasSite = l.website ? "Sim" : "Não";
-                const siteUrl = l.website || "-";
-                const row = `"${l.name}";"${l.phone}";"${hasSite}";"${siteUrl}";"${l.rating}";"${l.reviews}";"${l.address}";"${l.status}"`;
-                csvContent += row + "\n";
-            });
-
-            const encodedUri = encodeURI(csvContent);
-            const link = document.createElement("a");
-            link.setAttribute("href", encodedUri);
-            link.setAttribute("download", `leads_prospeccao_${Date.now()}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        // Execução garantida independente de iframe sandbox
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', initApp);
-        } else {
-            initApp();
-        }
+        document.addEventListener('DOMContentLoaded', initApp);
     </script>
 </body>
 </html>
