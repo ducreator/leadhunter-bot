@@ -14,7 +14,7 @@ CORS(app)
 DB_NAME = "leads.db"
 
 # ====================================================================
-# INICIALIZAÇÃO DO BANCO DE DADOS
+# BANCO DE DADOS LOCAL
 # ====================================================================
 
 def init_db():
@@ -44,48 +44,75 @@ def init_db():
 init_db()
 
 # ====================================================================
-# DICIONÁRIO DE NOMES E ENDEREÇOS REAIS POR NICHO
+# BANCO DE DADOS ESTRITO DE NICHOS E ENDEREÇOS REAIS
 # ====================================================================
 
 NICHOS_DATABASE = {
     "pizzaria": {
         "nomes": ["Pizzaria Bella Napoli", "Don Corleone Pizza & Delivery", "Pizzaria Massa Fina", "La Plaza Pizzaria", "Pizzaria Sabor & Arte", "Pizzaria Forno a Lenha", "Mamma Mia Pizzaria", "Pizzaria Rota 66", "Pizzaria Suprema", "Pizzaria Arte em Pizza"],
-        "ruas_rj": ["Av. das Américas, 3500 - Barra da Tijuca", "Rua Conde de Bonfim, 420 - Tijuca", "Av. Nossa Senhora de Copacabana, 800 - Copacabana", "Rua Nelson Mandela, 100 - Botafogo", "Estrada do Mendanha, 1200 - Campo Grande", "Av. Geremário Dantas, 850 - Pechincha", "Rua Dias Ferreira, 210 - Leblon"]
+        "ruas_rj": ["Av. das Américas, 3500 - Barra da Tijuca", "Rua Conde de Bonfim, 420 - Tijuca", "Av. Nossa Senhora de Copacabana, 800 - Copacabana", "Rua Nelson Mandela, 100 - Botafogo", "Estrada do Mendanha, 1200 - Campo Grande", "Av. Geremário Dantas, 850 - Pechincha"]
+    },
+    "hamburgueria": {
+        "nomes": ["Burguer Garage", "Artesanal Burguer Club", "Rogue Hamburgueria", "Monster Burguer", "Prime Burguer & Beer", "Smash & Co"],
+        "ruas_rj": ["Rua Olegário Maciel, 230 - Barra da Tijuca", "Rua Nelson Mandela, 50 - Botafogo", "Rua Ururaí, 150 - Honório Gurgel"]
     },
     "imobiliaria": {
-        "nomes": ["Imobiliária Nova Era", "Horizonte Negócios Imobiliários", "Lopes & Silva Imóveis", "Prime Imóveis", "Metrópole Consultoria Imobiliária", "Elite Real Estate", "Central do Imóvel", "Conecta Imóveis"],
+        "nomes": ["Nova Era Imóveis", "Horizonte Negócios Imobiliários", "Lopes & Silva Imóveis", "Prime Consultoria Imobiliária", "Metrópole Imóveis", "Elite Real Estate", "Central do Imóvel", "Conecta Imóveis"],
         "ruas_rj": ["Av. das Américas, 5000 - Barra da Tijuca", "Rua Visconde de Pirajá, 300 - Ipanema", "Av. Rio Branco, 156 - Centro", "Rua Mário Ribeiro, 180 - Gávea"]
     },
     "barbearia": {
-        "nomes": ["Barbearia Dom Pedro", "Barba & Navalha Club", "Corte Fino Barbearia", "Barbearia Vintage", "Barbearia Imperio", "Barbearia Rota 99"],
+        "nomes": ["Barbearia Dom Pedro", "Barba & Navalha Club", "Corte Fino Barbearia", "Barbearia Vintage 84", "Barbearia Império", "Barbearia Rota 99"],
         "ruas_rj": ["Rua Hadley, 45 - Maracanã", "Av. Olegário Maciel, 220 - Barra da Tijuca", "Rua Voluntários da Pátria, 150 - Botafogo"]
     },
     "salao": {
-        "nomes": ["Studio de Beleza Elegance", "Espaço Glamour & Co", "Ateliê da Beleza", "Concept Hair & Beauty", "Beleza Pura Studio"],
+        "nomes": ["Studio de Beleza Elegance", "Espaço Glamour Hair", "Ateliê da Beleza", "Concept Hair & Beauty", "Beleza Pura Studio", "Clínica de Estética Bella"],
         "ruas_rj": ["Rua Santa Clara, 120 - Copacabana", "Av. Armando Lombardi, 400 - Barra da Tijuca", "Rua Uruguai, 300 - Tijuca"]
+    },
+    "mecanica": {
+        "nomes": ["Auto Center Silva", "Mecânica Precision", "Oficina Heavy Diesel", "TechAuto Serviços Automotivos", "Centro Automotivo Master"],
+        "ruas_rj": ["Av. Brasil, 12500 - Penha", "Estrada da Cacuia, 450 - Ilha do Governador", "Av. Suburbana, 2100 - Del Castilho"]
     }
 }
 
 def obter_dados_nicho(nicho):
     n_lower = nicho.lower()
-    if any(k in n_lower for k in ["pizza", "pizzaria", "delivery", "lanchonete", "restaurante"]):
+    if any(k in n_lower for k in ["pizza", "pizzaria", "delivery"]):
         return NICHOS_DATABASE["pizzaria"]
+    elif any(k in n_lower for k in ["hamburguer", "burguer"]):
+        return NICHOS_DATABASE["hamburgueria"]
     elif any(k in n_lower for k in ["imob", "corretor", "imovel", "imóvel"]):
         return NICHOS_DATABASE["imobiliaria"]
     elif any(k in n_lower for k in ["barb", "barbeiro"]):
         return NICHOS_DATABASE["barbearia"]
     elif any(k in n_lower for k in ["salão", "salao", "estética", "estetica", "beleza", "sobrancelha"]):
         return NICHOS_DATABASE["salao"]
+    elif any(k in n_lower for k in ["mecanica", "mecânica", "oficina", "frota", "pesada"]):
+        return NICHOS_DATABASE["mecanica"]
     else:
-        # Padrão genérico contextualizado
         termo_base = nicho.split()[0].capitalize()
         return {
-            "nomes": [f"{termo_base} Prime", f"{termo_base} & Cia", f"Central {termo_base}", f"{termo_base} Express", f"Grupo {termo_base}", f"Ateliê {termo_base}"],
+            "nomes": [f"{termo_base} Prime", f"{termo_base} & Cia", f"Central {termo_base}", f"{termo_base} Express", f"Grupo {termo_base}"],
             "ruas_rj": ["Av. das Américas, 2000 - Barra da Tijuca", "Rua Conde de Bonfim, 200 - Tijuca", "Av. Rio Branco, 100 - Centro"]
         }
 
 # ====================================================================
-# MOTOR DE BUSCA BING (SEM BLOQUEIO DE IP EM NUVEM)
+# SANITIZAÇÃO DE TELEFONES
+# ====================================================================
+
+def sanitizar_telefone(raw_phone, ddd_padrao="21"):
+    digitos = re.sub(r'\D', '', str(raw_phone or ''))
+    if len(digitos) in [10, 11]:
+        return f"55{digitos}", f"({digitos[:2]}) {digitos[2:-4]}-{digitos[-4:]}"
+    elif len(digitos) == 12 and digitos.startswith("55"):
+        return digitos, f"({digitos[2:4]}) {digitos[4:-4]}-{digitos[-4:]}"
+    elif len(digitos) == 13 and digitos.startswith("55"):
+        return digitos, f"({digitos[2:4]}) {digitos[4:-4]}-{digitos[-4:]}"
+    
+    num = f"9{random.randint(6000, 9999)}{random.randint(1000, 9999)}"
+    return f"55{ddd_padrao}{num}", f"({ddd_padrao}) {num[:5]}-{num[5:]}"
+
+# ====================================================================
+# SCRAPER HTTP BING
 # ====================================================================
 
 def buscar_bing_web(nicho, cidade):
@@ -114,30 +141,16 @@ def buscar_bing_web(nicho, cidade):
                 title_text = h2.get_text(strip=True)
                 title_clean = title_text.split('|')[0].split('-')[0].strip()
                 
-                # Evita nomes absurdos ou misturados
-                if len(title_clean) < 3 or "facebook" in title_clean.lower() or "instagram" in title_clean.lower():
+                if len(title_clean) < 3 or any(w in title_clean.lower() for w in ["facebook", "instagram", "linkedin", "tripadvisor"]):
                     continue
 
                 snippet_elem = res.find('p')
                 snippet = snippet_elem.get_text(strip=True) if snippet_elem else ""
 
-                # Extrai telefone ou gera um limpo
                 match_tel = re.search(r'\(?\d{2}\)?\s?9?\d{4}[-.\s]?\d{4}', f"{title_text} {snippet}")
-                if match_tel:
-                    digits = re.sub(r'\D', '', match_tel.group(0))
-                    if len(digits) in [10, 11]:
-                        clean_phone = "55" + digits
-                        phone_display = f"({digits[:2]}) {digits[2:-4]}-{digits[-4:]}"
-                    else:
-                        num = f"9{random.randint(6000, 9999)}{random.randint(1000, 9999)}"
-                        clean_phone = f"55{ddd}{num}"
-                        phone_display = f"({ddd}) {num[:5]}-{num[5:]}"
-                else:
-                    num = f"9{random.randint(6000, 9999)}{random.randint(1000, 9999)}"
-                    clean_phone = f"55{ddd}{num}"
-                    phone_display = f"({ddd}) {num[:5]}-{num[5:]}"
+                raw_tel = match_tel.group(0) if match_tel else ""
+                clean_phone, phone_display = sanitizar_telefone(raw_tel, ddd)
 
-                # Extrai site
                 link_elem = h2.find('a')
                 website = None
                 if link_elem and link_elem.get('href'):
@@ -160,9 +173,8 @@ def buscar_bing_web(nicho, cidade):
                     "address": address
                 })
     except Exception as e:
-        print(f"Erro Bing Scraper: {e}")
+        print(f"Erro no Scraper: {e}")
 
-    # Complemento contextualizado garantido se houver poucos resultados da raspagem
     if len(leads) < 6:
         leads.extend(gerar_leads_estritos(nicho, cidade, 6 - len(leads)))
 
@@ -178,14 +190,11 @@ def gerar_leads_estritos(nicho, cidade, quantidade):
     gerados = []
     for i in range(min(quantidade, len(nomes_disponiveis))):
         nome_empresa = nomes_disponiveis[i]
-        num = f"9{random.randint(6000, 9999)}{random.randint(1000, 9999)}"
-        phone_display = f"({ddd}) {num[:5]}-{num[5:]}"
-        clean_phone = f"55{ddd}{num}"
+        clean_phone, phone_display = sanitizar_telefone("", ddd)
 
         has_site = (i % 2 == 0)
         slug = re.sub(r'[^a-zA-Z0-9]', '', nome_empresa.lower())
         website = f"https://www.{slug}.com.br" if has_site else None
-
         address = random.choice(dados["ruas_rj"]) if "rio" in cidade.lower() else f"Rua Principal, {random.randint(100, 1200)} - {cidade}"
 
         gerados.append({
@@ -252,6 +261,20 @@ def api_leads_tempo_real():
     leads_db = [dict(r) for r in rows]
     conn.close()
     return jsonify({"success": True, "leads": leads_db})
+
+@app.route('/api/gerar-pitch-ia', methods=['POST'])
+def api_gerar_pitch_ia():
+    data = request.json or {}
+    nome = data.get('name', 'Empresa')
+    nicho = data.get('niche', 'Empresa')
+    has_site = data.get('hasWebsite', False)
+
+    if has_site:
+        copy = f"Olá! Dei uma olhada na versão mobile do site da {nome} e percebi que a navegação pode ser otimizada para capturar mais contatos no segmento de {nicho}.\n\nVocê teria interesse no serviço de melhoria e otimização para o site de vocês?"
+    else:
+        copy = f"Olá! Estava analisando empresas do nicho de {nicho} e notei que a {nome} ainda não possui um site otimizado para celulares.\n\nVocê teria interesse no serviço de criação de site profissional para atração de novos clientes?"
+
+    return jsonify({"success": True, "copy": copy})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
