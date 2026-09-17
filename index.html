@@ -38,9 +38,6 @@
             </div>
 
             <div class="flex items-center space-x-2">
-                <button id="openApiKeyModal" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-2 rounded-xl text-xs border border-slate-700 flex items-center gap-1.5">
-                    <i class="fa-solid fa-key text-amber-400"></i> API Key Gemini
-                </button>
                 <button id="exportCsvBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-xl text-xs font-medium transition shadow-lg flex items-center gap-2">
                     <i class="fa-solid fa-file-excel"></i> Exportar CSV
                 </button>
@@ -118,7 +115,7 @@
         <!-- INDICADOR DE CARREGAMENTO -->
         <div id="loadingIndicator" class="hidden py-12 text-center space-y-3">
             <div class="inline-block animate-spin rounded-full h-10 w-10 border-4 border-purple-500 border-t-transparent"></div>
-            <p class="text-sm font-medium text-slate-300">Buscando estabelecimentos em tempo real no Google Maps...</p>
+            <p class="text-sm font-medium text-slate-300">Buscando estabelecimentos em tempo real...</p>
         </div>
 
         <section id="leadsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></section>
@@ -147,21 +144,11 @@
                 <textarea id="generatedCopyText" rows="6" class="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-xs text-slate-200 font-sans leading-relaxed focus:outline-none"></textarea>
             </div>
 
-            <div id="cooldownStatus" class="hidden text-xs bg-amber-500/10 border border-amber-500/30 text-amber-300 p-2.5 rounded-xl flex items-center justify-between font-medium">
-                <span class="flex items-center gap-1.5">
-                    <i class="fa-solid fa-shield-halved text-amber-400"></i>
-                    <span>Trava Anti-Ban: aguarde <b id="cooldownTimer">60s</b></span>
-                </span>
-                <button id="skipCooldownBtn" type="button" class="bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 px-2.5 py-1 rounded-lg text-[10px] font-semibold transition flex items-center gap-1">
-                    <i class="fa-solid fa-bolt"></i> Pular Trava
-                </button>
-            </div>
-
             <div class="flex items-center space-x-3 pt-2">
                 <button id="copyTextBtn" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 py-2.5 rounded-xl text-xs border border-slate-700 flex items-center justify-center gap-2">
                     <i class="fa-solid fa-copy"></i> Copiar Texto
                 </button>
-                <a id="openWhatsappLink" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition">
+                <a id="openWhatsappLink" target="_blank" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-xs font-medium flex items-center justify-center gap-2 transition cursor-pointer">
                     <i class="fa-brands fa-whatsapp text-base"></i> Abrir WhatsApp
                 </a>
             </div>
@@ -178,18 +165,10 @@
             "Pet Shop e Clínica Veterinária",
             "Clínica de Estética Avançada",
             "Dermatologia e Odontologia Estética",
-            "Cirurgia Plástica",
             "Escritório de Advocacia",
-            "Consultoria Financeira",
-            "Arquitetura e Design de Interiores",
-            "Energia Solar e Automação Residencial",
             "Imobiliária e Corretor de Imóveis",
             "Academia e Studio de Pilates",
-            "Curso Técnico e Especializações",
-            "Oficina Mecânica Frotas e Linha Pesada",
-            "Assistência Técnica Especializada",
-            "Autoescola e Centro de Condutores",
-            "Fotografia e Casa de Festas"
+            "Oficina Mecânica Frotas e Linha Pesada"
         ];
 
         const CIDADES_POPULARES = [
@@ -198,16 +177,11 @@
             "Belo Horizonte, MG",
             "Curitiba, PR",
             "Brasília, DF",
-            "Campinas, SP",
-            "Niterói, RJ",
-            "Porto Alegre, RS",
-            "Salvador, BA",
-            "Recife, PE"
+            "Niterói, RJ"
         ];
 
         let currentLeads = [];
         let currentActiveLead = null;
-        let cooldownInterval = null;
 
         function initApp() {
             setupDropdownMenu(document.getElementById('nicheInput'), document.getElementById('nicheSuggestions'), document.getElementById('btnToggleNiche'), NICHOS_VARIADOS);
@@ -216,26 +190,22 @@
             document.getElementById('searchForm').addEventListener('submit', handleSearchSubmit);
             document.getElementById('closeCopyModal').addEventListener('click', () => document.getElementById('copyModal').classList.add('hidden'));
             document.getElementById('pitchTemplateSelect').addEventListener('change', updateCopyTextWithIA);
+            
+            document.getElementById('generatedCopyText').addEventListener('input', syncWhatsappUrl);
 
             document.getElementById('copyTextBtn').addEventListener('click', () => {
                 navigator.clipboard.writeText(document.getElementById('generatedCopyText').value);
-                alert('Mensagem copiada para a área de transferência!');
+                alert('Mensagem copiada!');
             });
 
-            document.getElementById('openWhatsappLink').addEventListener('click', (e) => {
-                if (isCooldownActive()) {
-                    e.preventDefault();
-                    alert('Aguarde a trava Anti-Ban zerar ou clique em "Pular Trava"!');
-                    return;
-                }
-                startAntiBanCooldown();
-            });
-
-            document.getElementById('skipCooldownBtn').addEventListener('click', resetAntiBanCooldown);
-
-            checkCooldownOnLoad();
             fetchLeadsTempoReal();
-            setInterval(fetchLeadsTempoReal, 10000);
+        }
+
+        function syncWhatsappUrl() {
+            if (!currentActiveLead || !currentActiveLead.clean_phone) return;
+            const texto = document.getElementById('generatedCopyText').value;
+            const link = document.getElementById('openWhatsappLink');
+            link.href = `https://api.whatsapp.com/send?phone=${currentActiveLead.clean_phone}&text=${encodeURIComponent(texto)}`;
         }
 
         function setupDropdownMenu(input, container, toggleBtn, dataset) {
@@ -281,54 +251,6 @@
             });
         }
 
-        function startAntiBanCooldown() {
-            const cooldownMs = 60 * 1000;
-            const endTime = Date.now() + cooldownMs;
-            localStorage.setItem('wa_cooldown_end', endTime);
-            updateCooldownUI();
-        }
-
-        function resetAntiBanCooldown() {
-            localStorage.removeItem('wa_cooldown_end');
-            if (cooldownInterval) clearInterval(cooldownInterval);
-            cooldownInterval = null;
-            document.getElementById('cooldownStatus').classList.add('hidden');
-            document.getElementById('openWhatsappLink').classList.remove('opacity-50', 'cursor-not-allowed');
-        }
-
-        function isCooldownActive() {
-            const endTime = parseInt(localStorage.getItem('wa_cooldown_end') || '0', 10);
-            return Date.now() < endTime;
-        }
-
-        function checkCooldownOnLoad() {
-            if (isCooldownActive()) {
-                updateCooldownUI();
-            }
-        }
-
-        function updateCooldownUI() {
-            const statusBox = document.getElementById('cooldownStatus');
-            const timerLabel = document.getElementById('cooldownTimer');
-            const waBtn = document.getElementById('openWhatsappLink');
-
-            if (cooldownInterval) clearInterval(cooldownInterval);
-
-            cooldownInterval = setInterval(() => {
-                const endTime = parseInt(localStorage.getItem('wa_cooldown_end') || '0', 10);
-                const remainingSecs = Math.ceil((endTime - Date.now()) / 1000);
-
-                if (remainingSecs > 0) {
-                    statusBox.classList.remove('hidden');
-                    timerLabel.innerText = `${remainingSecs}s`;
-                    waBtn.classList.add('opacity-50', 'cursor-not-allowed');
-                } else {
-                    resetAntiBanCooldown();
-                }
-            }, 1000);
-        }
-
-        // APENAS ATUALIZA SE AINDA NÃO HOUVER LEADS OU SE VIEREM NOVOS DADOS
         async function fetchLeadsTempoReal() {
             try {
                 const res = await fetch('/api/leads-tempo-real');
@@ -340,7 +262,7 @@
                     updateStats();
                 }
             } catch (e) {
-                console.warn('Servidor Python em sincronização...');
+                console.warn('Conectando ao servidor...');
             }
         }
 
@@ -368,10 +290,10 @@
                     renderLeads();
                     updateStats();
                 } else {
-                    alert(data.message || 'Nenhum lead encontrado para essa consulta.');
+                    alert(data.message || 'Nenhum lead encontrado.');
                 }
             } catch (err) {
-                alert('Erro na conexão com o servidor de busca. Verifique os logs da aplicação.');
+                alert('Erro na conexão com o servidor.');
             } finally {
                 document.getElementById('loadingIndicator').classList.add('hidden');
             }
@@ -446,21 +368,7 @@
         async function updateCopyTextWithIA() {
             if (!currentActiveLead) return;
 
-            const objective = document.getElementById('pitchTemplateSelect').value;
             const hasSite = !!(currentActiveLead.website && typeof currentActiveLead.website === 'string' && currentActiveLead.website.trim().length > 0);
-
-            let fallbackCopy = "";
-            if (hasSite) {
-                if (objective === 'diagnostico') {
-                    fallbackCopy = `Olá! Dei uma olhada na versão mobile do site da ${currentActiveLead.name} e percebi que a navegação pode ser otimizada para capturar mais contatos. A cada segundo de atraso, cerca de 20% das pessoas desistem antes de chamar.\n\nVocê teria interesse no serviço de melhoria e otimização para o site de vocês?`;
-                } else if (objective === 'amostra') {
-                    fallbackCopy = `Olá! Analisei o site da ${currentActiveLead.name} pelo celular e notei boas oportunidades para aumentar a conversão de novos clientes.\n\nVocê teria interesse em conhecer nosso serviço de reformulação e melhoria para o site de vocês?`;
-                } else {
-                    fallbackCopy = `Olá! Pequenos gargalos na versão mobile do site da ${currentActiveLead.name} podem estar fazendo você perder contatos diariamente para concorrentes.\n\nVocê teria interesse no serviço de otimização para acelerar o site de vocês e converter mais visitantes?`;
-                }
-            } else {
-                fallbackCopy = `Olá! Notei que a ${currentActiveLead.name} ainda não possui um site otimizado para capturar novos clientes vindos da internet.\n\nVocê teria interesse no serviço de criação de site profissional para atração de contatos?`;
-            }
 
             try {
                 const res = await fetch('/api/gerar-pitch-ia', {
@@ -469,29 +377,19 @@
                     body: JSON.stringify({
                         name: currentActiveLead.name,
                         niche: currentActiveLead.niche,
-                        location: currentActiveLead.location,
-                        hasWebsite: hasSite,
-                        rating: currentActiveLead.rating,
-                        reviews: currentActiveLead.reviews,
-                        objective: objective
+                        hasWebsite: hasSite
                     })
                 });
 
                 const data = await res.json();
                 if (data.success && data.copy) {
                     document.getElementById('generatedCopyText').value = data.copy;
-                } else {
-                    document.getElementById('generatedCopyText').value = fallbackCopy;
                 }
             } catch (e) {
-                document.getElementById('generatedCopyText').value = fallbackCopy;
+                console.error(e);
             }
 
-            const copyFinal = document.getElementById('generatedCopyText').value;
-            if (currentActiveLead.clean_phone) {
-                const encodedMsg = encodeURIComponent(copyFinal);
-                document.getElementById('openWhatsappLink').href = `https://wa.me/${currentActiveLead.clean_phone}?text=${encodedMsg}`;
-            }
+            syncWhatsappUrl();
         }
 
         document.addEventListener('DOMContentLoaded', initApp);
