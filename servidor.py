@@ -278,3 +278,12 @@ def api_gerar_pitch_ia():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+
+@app.route('/api/reset-db', methods=['POST'])
+def reset_db():
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM leads")
+    conn.commit()
+    conn.close()
+    return jsonify({"success": True, "message": "Banco de dados limpo!"})
