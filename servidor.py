@@ -70,7 +70,7 @@ def aplicar_spintax(texto):
         texto = padrao.sub(lambda m: random.choice(m.group(1).split('|')), texto)
     return texto
 
-def gerar_pitch_com_ia(nome, nicho, cidade, possui_site, nota, avaliacoes, objetivo="diagnostico", api_key=None):
+def gerar_pitch_com_ia(nome, nicho, cidade="", possui_site=False, nota="", avaliacoes="", objetivo="diagnostico", api_key=None):
     if isinstance(possui_site, str):
         possui_site_bool = possui_site.lower() in ['true', '1', 'sim']
     else:
@@ -84,18 +84,15 @@ Escreva uma mensagem de WhatsApp curta, direta e amigável para o dono da empres
 EMPRESA:
 - Nome: {nome}
 - Nicho: {nicho}
-- Cidade: {cidade}
-- Possui site?: {'SIM (Foco em diagnosticar falha de carregamento mobile e conversão do WhatsApp)' if possui_site_bool else 'NÃO (Foco em autoridade imediata e perda de clientes para concorrentes)'}
-- Avaliações Google: {nota} ⭐ ({avaliacoes} avaliações)
+- Possui site?: {'SIM (Foco em otimização da navegação mobile e velocidade de conversão do WhatsApp)' if possui_site_bool else 'NÃO (Foco em criação de site rápido para captação de clientes)'}
 - Estratégia/Ângulo selecionado: {objetivo}
 
-DIRETRIZES DE ABORDAGEM (SEM SPAM):
-1. Se o objetivo for 'diagnostico' ou 'impacto':
-   - Cite um erro comum no mobile (ex: atraso de 4 a 6 segundos para carregar o botão do Whats gera ~20% a 30% de perda de novos clientes em {cidade}).
-2. Se o objetivo for 'amostra':
-   - Diga que criou um protótipo/esboço rápido da versão mobile para dobrar os contatos.
-3. Termine com uma Pergunta de Permissão: "Posso te mandar o link da prévia/diagnóstico por aqui sem compromisso para você dar uma olhada?"
-4. Retorne APENAS o texto da mensagem, sem títulos e sem aspas.
+REGRAS OBRIGATÓRIAS DE ABORDAGEM:
+1. NÃO mencione localização/cidade, nota do Google ou quantidade de avaliações.
+2. NÃO mencione que fez demonstração, modelo ou protótipo, e NÃO pergunte se ele quer ver uma demonstração.
+3. Cite apenas o impacto de navegação mobile lenta ou falta de site (atrasos no carregamento fazem clientes desistirem antes de chamar).
+4. Termine perguntando diretamente se a pessoa tem interesse no serviço de melhoria/otimização do site de vocês.
+5. Retorne APENAS o texto final da mensagem, sem títulos e sem aspas.
 """
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
             headers = {'Content-Type': 'application/json'}
@@ -110,27 +107,27 @@ DIRETRIZES DE ABORDAGEM (SEM SPAM):
         except Exception as e:
             print(f"⚠️ Erro no Gemini ({e}). Usando gerador de contingência...")
 
-    # Fallback Spintax Inteligente
+    # Fallback Spintax Inteligente (Sem nota, cidade ou menção a demonstração)
     saudacao = "{Olá|Opa|Tudo bem|Oi, tudo joia}"
     if possui_site_bool:
         corpo = (
-            f"{{Notei que a empresa de vocês tem ótimas avaliações em {cidade} ({nota} ⭐).}} "
-            "{{Fiz um diagnóstico rápido no site pelo celular e vi que o carregamento do botão do WhatsApp está levando mais de 5 segundos|Dei uma olhada na versão mobile do site e percebi que a navegação pode ser otimizada para capturar mais contatos}}. "
-            "{{A cada segundo de atraso, cerca de 20% das pessoas desistem antes de chamar.|Isso faz com que potenciais clientes em " + cidade + " acabem buscando concorrentes.}}"
+            f"{{Dei uma olhada na versão mobile do site da {nome} e percebi que a navegação pode ser otimizada para capturar mais contatos.|"
+            f"Analisei o site da {nome} pelo celular e notei gargalos que podem estar fazendo vocês perderem clientes para concorrentes.}} "
+            "{{A cada segundo de atraso no carregamento, cerca de 20% das pessoas desistem antes de chamar.|Isso reduz significativamente a quantidade de contatos recebidos diariamente.}}"
         )
-        cta = "{Fiz uma demonstração simples de como ficaria a versão mobile otimizada. Posso te enviar o link para você dar uma olhada sem compromisso?|Montei um esboço rápido do cabeçalho focado em conversão. Quer que eu te mande no Whats para você avaliar?}"
+        cta = "{Você teria interesse no serviço de melhoria e otimização para o site de vocês?|Teria interesse em conhecer nosso serviço de melhoria do site para converter mais visitantes em clientes?}"
     else:
         corpo = (
-            f"{{Estava buscando referências de {nicho} em {cidade} e vi as {avaliacoes} avaliações excelentes de vocês.}} "
-            "{{Porém, notei que vocês ainda não possuem um site oficial otimizado no perfil do Google.|Como hoje a maioria das buscas é pelo celular, a falta de uma página rápida faz vocês perderem orçamentos diários.}}"
+            f"{{Estava analisando empresas do nicho de {nicho} e notei que a {nome} ainda não possui um site otimizado para o celular.|"
+            f"Percebi que a {nome} ainda não conta com um site oficial focado em capturar novos clientes vindos da internet.}}"
         )
-        cta = "{Montei um modelo prévio de como ficaria a página oficial de vocês no celular. Posso te mandar o link aqui sem compromisso?|Posso te mandar 2 exemplos do meu portfólio focados no seu nicho só para você ver a estrutura?}"
+        cta = "{Você teria interesse no serviço de criação e melhoria de site profissional para atração de novos contatos?|Teria interesse em entender como nosso serviço de desenvolvimento de sites pode aumentar suas vendas?}"
 
     return aplicar_spintax(f"{saudacao}!\n\n{corpo}\n\n{cta}")
 
 
 # ====================================================================
-# SCRAPER EM TEMPO REAL (GOOGLE MAPS REAL SEM DADOS FAKE)
+# SCRAPER EM TEMPO REAL (GOOGLE MAPS COM TRATAMENTO SEGURO)
 # ====================================================================
 
 async def extrair_e_salvar_leads(termo_busca, max_resultados=12):
@@ -140,94 +137,96 @@ async def extrair_e_salvar_leads(termo_busca, max_resultados=12):
     nicho_limpo = termo_busca.split(" em ")[0] if " em " in termo_busca else "Geral"
     cidade_limpa = termo_busca.split(" em ")[1] if " em " in termo_busca else "Brasil"
 
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(
-            headless=True,
-            args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
-        )
-        context = await browser.new_context(
-            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-            locale="pt-BR"
-        )
-        page = await context.new_page()
-        url_maps = f"https://www.google.com/maps/search/{termo_busca.replace(' ', '+')}"
+    try:
+        async with async_playwright() as p:
+            browser = await p.chromium.launch(
+                headless=True,
+                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
+            )
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                locale="pt-BR"
+            )
+            page = await context.new_page()
+            url_maps = f"https://www.google.com/maps/search/{termo_busca.replace(' ', '+')}"
 
-        try:
-            await page.goto(url_maps, wait_until="domcontentloaded", timeout=30000)
-            await page.wait_for_timeout(2500)
-
-            feed_selector = 'div[role="feed"]'
             try:
-                await page.wait_for_selector(feed_selector, timeout=8000)
-                for _ in range(max_resultados // 2):
-                    await page.eval_on_selector(feed_selector, "el => el.scrollBy(0, 1200)")
-                    await page.wait_for_timeout(1000)
-            except Exception:
-                pass
+                await page.goto(url_maps, wait_until="domcontentloaded", timeout=30000)
+                await page.wait_for_timeout(2500)
 
-            elementos = await page.query_selector_all('a[href*="/maps/place/"]')
-            links_unicos = []
-            for elem in elementos:
-                href = await elem.get_attribute('href')
-                if href and href not in links_unicos:
-                    links_unicos.append(href)
-                if len(links_unicos) >= max_resultados:
-                    break
-
-            conn = sqlite3.connect(DB_NAME)
-            cursor = conn.cursor()
-
-            for index, link in enumerate(links_unicos, start=1):
+                feed_selector = 'div[role="feed"]'
                 try:
-                    await page.goto(link, wait_until="domcontentloaded", timeout=12000)
-                    await page.wait_for_timeout(800)
+                    await page.wait_for_selector(feed_selector, timeout=8000)
+                    for _ in range(max_resultados // 2):
+                        await page.eval_on_selector(feed_selector, "el => el.scrollBy(0, 1200)")
+                        await page.wait_for_timeout(1000)
+                except Exception:
+                    pass
 
-                    nome_elem = await page.query_selector('h1')
-                    nome = await nome_elem.inner_text() if nome_elem else "Empresa sem nome"
+                elementos = await page.query_selector_all('a[href*="/maps/place/"]')
+                links_unicos = []
+                for elem in elementos:
+                    href = await elem.get_attribute('href')
+                    if href and href not in links_unicos:
+                        links_unicos.append(href)
+                    if len(links_unicos) >= max_resultados:
+                        break
 
-                    rating_elem = await page.query_selector('div.F7L3fd span[aria-hidden="true"], span.ceRMgd')
-                    nota = rating_elem.inner_text().replace(',', '.').strip() if rating_elem else "4.5"
+                conn = sqlite3.connect(DB_NAME)
+                cursor = conn.cursor()
 
-                    rev_elem = await page.query_selector('button[jsaction*="moreReviews"] span, span[aria-label*="avaliações"]')
-                    avaliacoes = re.sub(r'\D', '', await rev_elem.inner_text()) if rev_elem else "10"
+                for index, link in enumerate(links_unicos, start=1):
+                    try:
+                        await page.goto(link, wait_until="domcontentloaded", timeout=12000)
+                        await page.wait_for_timeout(800)
 
-                    phone_btn = await page.query_selector('button[data-tooltip*="telefone"], button[aria-label*="Telefone"], button[data-item-id*="phone"]')
-                    telefone = "Não informado"
-                    clean_phone = ""
-                    if phone_btn:
-                        aria_label = await phone_btn.get_attribute('aria-label')
-                        if aria_label:
-                            match = re.search(r'[\d\(\)\-\s\+]{8,}', aria_label)
-                            if match:
-                                telefone = match.group(0).strip()
-                                clean_digits = re.sub(r'\D', '', telefone)
-                                if len(clean_digits) >= 8:
-                                    clean_phone = "55" + clean_digits if not clean_digits.startswith("55") else clean_digits
+                        nome_elem = await page.query_selector('h1')
+                        nome = await nome_elem.inner_text() if nome_elem else "Empresa sem nome"
 
-                    site_btn = await page.query_selector('a[data-tooltip*="website"], a[aria-label*="website"], a[data-item-id="authority"]')
-                    website = await site_btn.get_attribute('href') if site_btn else None
+                        rating_elem = await page.query_selector('div.F7L3fd span[aria-hidden="true"], span.ceRMgd')
+                        nota = rating_elem.inner_text().replace(',', '.').strip() if rating_elem else "4.5"
 
-                    end_btn = await page.query_selector('button[data-item-id="address"]')
-                    endereco = (await end_btn.get_attribute('aria-label')).replace("Endereço: ", "").strip() if end_btn else cidade_limpa
+                        rev_elem = await page.query_selector('button[jsaction*="moreReviews"] span, span[aria-label*="avaliações"]')
+                        avaliacoes = re.sub(r'\D', '', await rev_elem.inner_text()) if rev_elem else "10"
 
-                    # Salva/Atualiza no banco para sincronização automática
-                    cursor.execute('''
-                        INSERT INTO leads (name, niche, location, phone, clean_phone, website, rating, reviews, address)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ''', (nome.strip(), nicho_limpo, cidade_limpa, telefone, clean_phone, website, float(nota) if nota.replace('.','',1).isdigit() else 4.5, int(avaliacoes) if avaliacoes.isdigit() else 0, endereco))
+                        phone_btn = await page.query_selector('button[data-tooltip*="telefone"], button[aria-label*="Telefone"], button[data-item-id*="phone"]')
+                        telefone = "Não informado"
+                        clean_phone = ""
+                        if phone_btn:
+                            aria_label = await phone_btn.get_attribute('aria-label')
+                            if aria_label:
+                                match = re.search(r'[\d\(\)\-\s\+]{8,}', aria_label)
+                                if match:
+                                    telefone = match.group(0).strip()
+                                    clean_digits = re.sub(r'\D', '', telefone)
+                                    if len(clean_digits) >= 8:
+                                        clean_phone = "55" + clean_digits if not clean_digits.startswith("55") else clean_digits
 
-                    conn.commit()
+                        site_btn = await page.query_selector('a[data-tooltip*="website"], a[aria-label*="website"], a[data-item-id="authority"]')
+                        website = await site_btn.get_attribute('href') if site_btn else None
 
-                except Exception as e:
-                    print(f"⚠️ Erro ao processar item {index}: {e}")
-                    continue
+                        end_btn = await page.query_selector('button[data-item-id="address"]')
+                        endereco = (await end_btn.get_attribute('aria-label')).replace("Endereço: ", "").strip() if end_btn else cidade_limpa
 
-            conn.close()
+                        cursor.execute('''
+                            INSERT INTO leads (name, niche, location, phone, clean_phone, website, rating, reviews, address)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (nome.strip(), nicho_limpo, cidade_limpa, telefone, clean_phone, website, float(nota) if nota.replace('.','',1).isdigit() else 4.5, int(avaliacoes) if avaliacoes.isdigit() else 0, endereco))
 
-        except Exception as e:
-            print(f"❌ Erro na raspagem: {e}")
+                        conn.commit()
 
-        await browser.close()
+                    except Exception as e:
+                        print(f"⚠️ Erro ao processar item {index}: {e}")
+                        continue
+
+                conn.close()
+
+            except Exception as e:
+                print(f"❌ Erro na navegação do Maps: {e}")
+
+            await browser.close()
+    except Exception as err:
+        print(f"❌ Erro ao inicializar o Playwright: {err}")
 
 
 # ====================================================================
@@ -246,12 +245,16 @@ def api_buscar():
     termo = f"{niche} em {location}"
 
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(extrair_e_salvar_leads(termo, max_resultados=10))
-        loop.close()
+        # Executa o scraper Playwright de forma tratada para não dar Crash 500
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(extrair_e_salvar_leads(termo, max_resultados=10))
+            loop.close()
+        except Exception as scrape_err:
+            print(f"⚠️ Falha na execução do Playwright: {scrape_err}")
 
-        # Retorna leads reais salvos no banco SQLite
+        # Retorna os leads do SQLite de forma garantida
         conn = sqlite3.connect(DB_NAME)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -262,11 +265,12 @@ def api_buscar():
 
         return jsonify({"success": True, "leads": leads, "source": "real_database"})
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        print(f"❌ Erro na rota /api/buscar: {e}")
+        return jsonify({"success": False, "message": str(e), "leads": []}), 200
 
 @app.route('/api/leads-tempo-real', methods=['GET'])
 def api_leads_tempo_real():
-    """ Rota de Polling Automático para atualização sem recarregar a página """
+    """ Rota de Polling Automático """
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
@@ -282,10 +286,10 @@ def api_gerar_pitch_ia():
     texto_gerado = gerar_pitch_com_ia(
         nome=data.get('name', 'Empresa Local'),
         nicho=data.get('niche', 'Empresa'),
-        cidade=data.get('location', 'sua cidade'),
+        cidade=data.get('location', ''),
         possui_site=data.get('hasWebsite', False),
-        nota=data.get('rating', '4.5'),
-        avaliacoes=data.get('reviews', '20'),
+        nota=data.get('rating', ''),
+        avaliacoes=data.get('reviews', ''),
         objetivo=data.get('objective', 'diagnostico'),
         api_key=data.get('geminiApiKey', '')
     )
