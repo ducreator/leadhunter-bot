@@ -1,9 +1,9 @@
 import re
-import os
 import json
 import random
 import sqlite3
 import urllib.request
+import urllib.parse
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 
@@ -11,10 +11,6 @@ app = Flask(__name__, static_folder=".")
 CORS(app)
 
 DB_NAME = "leads.db"
-
-# ====================================================================
-# BANCO DE DADOS LOCAL
-# ====================================================================
 
 def init_db():
     conn = sqlite3.connect(DB_NAME)
@@ -42,147 +38,95 @@ def init_db():
 
 init_db()
 
-# ====================================================================
-# GERADOR DE LEADS COM TRATAMENTO ESTRITO DE NÚMERO
-# ====================================================================
+def buscar_google_places_real(nicho, cidade, google_api_key):
+    """ Busca estabelecimentos reais no Google Maps via Google Places API """
+    query = f"{nicho} em {cidade}"
+    url = f"https://maps.googleapis.com/maps/api/place/textsearch/json?query={urllib.parse.quote(query)}&key={google_api_key}&language=pt-BR"
+    
+    leads = []
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            results = data.get('results', [])
 
-def buscar_e_gerar_leads(nicho, cidade):
+            for place in results[:12]:
+                place_id = place.get('place_id')
+                nome = place.get('name', 'Empresa')
+                rating = place.get('rating', 4.5)
+                reviews = place.get('user_ratings_total', 0)
+                address = place.get('formatted_address', cidade)
+                
+                # Busca detalhes estendidos (Telefone e Website)
+                phone, clean_phone, website = extrair_detalhes_place(place_id, google_api_key)
+
+                leads.append({
+                    "name": nome,
+                    "niche": nicho,
+                    "location": cidade,
+                    "phone": phone,
+                    "clean_phone": clean_phone,
+                    "website": website,
+                    "rating": rating,
+                    "reviews": reviews,
+                    "address": address
+                })
+    except Exception as e:
+        print(f"⚠️ Erro na busca Places API: {e}")
+        
+    return leads
+
+def extrair_detalhes_place(place_id, api_key):
+    """ Traz telefone oficial e website do local """
+    url = f"https://maps.googleapis.com/maps/api/place/details/json?place_id={place_id}&fields=formatted_phone_number,international_phone_number,website&key={api_key}"
+    phone, clean_phone, website = "Não informado", "", None
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = json.loads(response.read().decode('utf-8')).get('result', {})
+            phone = data.get('formatted_phone_number', 'Não informado')
+            raw_phone = data.get('international_phone_number') or phone
+            clean_phone = re.sub(r'\D', '', raw_phone)
+            if clean_phone and not clean_phone.startswith('55'):
+                clean_phone = '55' + clean_phone
+            website = data.get('website')
+    except Exception:
+        pass
+    return phone, clean_phone, website
+
+def salvar_leads_no_banco(leads):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
-
-    prefixos = ["Studio", "Espaço", "Centro de Beleza", "Barbearia", "Clínica", "Ateliê", "Concept", "Grupo"]
-    sobrenomes = ["VIP", "Elegance", "Prime", "Imperial", "Central", "Master", "Luxo", "Style"]
-
-    ddd = "21" if "rio" in cidade.lower() or "rj" in cidade.lower() else "11"
-
-    for i in range(1, 9):
-        nome_empresa = f"{random.choice(prefixos)} {random.choice(sobrenomes)} - {nicho}"
-        
-        # Gerando partes numéricas
-        parte1 = random.randint(6000, 9999)
-        parte2 = random.randint(1000, 9999)
-        
-        # Telefone formatado para exibição visual
-        telefone = f"({ddd}) 9{parte1}-{parte2}"
-        
-        # OBRIGATÓRIO: Apenas dígitos (Sem -, sem (), sem espaços)
-        clean_phone = f"55{ddd}9{parte1}{parte2}"
-
-        has_site = (i % 2 == 0)
-        slug = re.sub(r'[^a-zA-Z0-9]', '', nome_empresa.lower())
-        website = f"https://www.{slug}.com.br" if has_site else None
-        rating = round(random.uniform(4.3, 5.0), 1)
-        reviews = random.randint(12, 190)
-        address = f"Av. Principal, {random.randint(100, 1500)} - {cidade}"
-
+    for item in leads:
         cursor.execute('''
             INSERT INTO leads (name, niche, location, phone, clean_phone, website, rating, reviews, address)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (nome_empresa, nicho, cidade, telefone, clean_phone, website, rating, reviews, address))
-
+        ''', (item['name'], item['niche'], item['location'], item['phone'], item['clean_phone'], item['website'], item['rating'], item['reviews'], item['address']))
     conn.commit()
     conn.close()
 
-# ====================================================================
-# AGENTE DE IA & GERADOR DE COPY
-# ====================================================================
-
-def aplicar_spintax(texto):
-    padrao = re.compile(r'\{([^{}]+)\}')
-    while padrao.search(texto):
-        texto = padrao.sub(lambda m: random.choice(m.group(1).split('|')), texto)
-    return texto
-
-def gerar_pitch_com_ia(nome, nicho, cidade="", possui_site=False, nota="", avaliacoes="", objetivo="diagnostico", api_key=None):
-    if isinstance(possui_site, str):
-        possui_site_bool = possui_site.lower() in ['true', '1', 'sim']
-    else:
-        possui_site_bool = bool(possui_site)
-
-    if api_key and api_key.strip():
-        try:
-            prompt = f"""Você é um especialista em conversão web. Escreva uma mensagem curta de WhatsApp.
-EMPRESA: {nome} | NICHO: {nicho} | POSSUI SITE: {'SIM' if possui_site_bool else 'NÃO'}
-REGRAS:
-1. NÃO mencione cidade, nota do Google ou quantidade de avaliações.
-2. NÃO ofereça demonstração ou modelo.
-3. Foque na perda de clientes por falta de site ou lentidão mobile.
-4. Termine perguntando se a pessoa tem interesse no serviço de melhoria do site.
-"""
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
-            headers = {'Content-Type': 'application/json'}
-            data = {"contents": [{"parts": [{"text": prompt}]}]}
-            req = urllib.request.Request(url, data=json.dumps(data).encode('utf-8'), headers=headers)
-            with urllib.request.urlopen(req, timeout=8) as response:
-                result = json.loads(response.read().decode('utf-8'))
-                return result['candidates'][0]['content']['parts'][0]['text'].strip()
-        except Exception:
-            pass
-
-    saudacao = "{Olá|Opa|Tudo bem|Oi, tudo joia}"
-    if possui_site_bool:
-        corpo = f"{{Dei uma olhada na versão mobile do site da {nome} e percebi que a navegação pode ser otimizada para capturar mais contatos.}}"
-        cta = "{Você teria interesse no serviço de melhoria e otimização para o site de vocês?}"
-    else:
-        corpo = f"{{Estava analisando empresas do nicho de {nicho} e notei que a {nome} ainda não possui um site otimizado para o celular.}}"
-        cta = "{Você teria interesse no serviço de criação de site profissional para atração de novos contatos?}"
-
-    return aplicar_spintax(f"{saudacao}!\n\n{corpo}\n\n{cta}")
-
-# ====================================================================
-# ROTAS FLASK
-# ====================================================================
-
-@app.route('/')
-def serve_index():
-    return send_from_directory('.', 'index.html')
-
 @app.route('/api/buscar', methods=['POST'])
 def api_buscar():
-    try:
-        data = request.json or {}
-        niche = data.get('niche', 'Barbearia e Salão de Beleza')
-        location = data.get('location', 'Rio de Janeiro, RJ')
+    data = request.json or {}
+    niche = data.get('niche', 'Imobiliária')
+    location = data.get('location', 'Rio de Janeiro, RJ')
+    places_key = data.get('placesApiKey', os.environ.get('GOOGLE_PLACES_KEY', ''))
 
-        buscar_e_gerar_leads(niche, location)
+    if places_key:
+        leads = buscar_google_places_real(niche, location, places_key)
+        if leads:
+            salvar_leads_no_banco(leads)
 
-        conn = sqlite3.connect(DB_NAME)
-        conn.row_factory = sqlite3.Row
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM leads ORDER BY id DESC LIMIT 20")
-        rows = cursor.fetchall()
-        leads = [dict(r) for r in rows]
-        conn.close()
-
-        return jsonify({"success": True, "leads": leads})
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e), "leads": []}), 200
-
-@app.route('/api/leads-tempo-real', methods=['GET'])
-def api_leads_tempo_real():
+    # Retorna do banco
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM leads ORDER BY id DESC LIMIT 50")
+    cursor.execute("SELECT * FROM leads ORDER BY id DESC LIMIT 20")
     rows = cursor.fetchall()
-    leads = [dict(r) for r in rows]
+    leads_db = [dict(r) for r in rows]
     conn.close()
-    return jsonify({"success": True, "leads": leads})
 
-@app.route('/api/gerar-pitch-ia', methods=['POST'])
-def api_gerar_pitch_ia():
-    data = request.json or {}
-    texto_gerado = gerar_pitch_com_ia(
-        nome=data.get('name', 'Empresa Local'),
-        nicho=data.get('niche', 'Empresa'),
-        cidade=data.get('location', ''),
-        possui_site=data.get('hasWebsite', False),
-        nota=data.get('rating', ''),
-        avaliacoes=data.get('reviews', ''),
-        objetivo=data.get('objective', 'diagnostico'),
-        api_key=data.get('geminiApiKey', '')
-    )
-    return jsonify({"success": True, "copy": texto_gerado})
+    return jsonify({"success": True, "leads": leads_db})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
