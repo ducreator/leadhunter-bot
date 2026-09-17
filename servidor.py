@@ -287,3 +287,18 @@ def reset_db():
     conn.commit()
     conn.close()
     return jsonify({"success": True, "message": "Banco de dados limpo!"})
+
+NICHOS_DATABASE = {
+    "hamburgueria": {
+        "nomes": [
+            "Garage Burguer", "Pampa Burguer", "Bullguer Artesanal", 
+            "Smash & Co", "Prime Burguer Club", "Monster Steak & Burguer",
+            "Rogue Hamburgueria", "Craft Burguer House", "The Real Burguer"
+        ],
+        "ruas_rj": [
+            "Rua Olegário Maciel, 230 - Barra da Tijuca", 
+            "Rua Nelson Mandela, 50 - Botafogo",
+            "Av. Mem de Sá, 120 - Lapa"
+        ]
+    }
+}
