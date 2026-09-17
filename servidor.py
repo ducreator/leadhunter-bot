@@ -13,7 +13,7 @@ CORS(app)
 DB_NAME = "leads.db"
 
 # ====================================================================
-# INICIALIZAÇÃO DO BANCO DE DADOS LOCAL
+# BANCO DE DADOS LOCAL
 # ====================================================================
 
 def init_db():
@@ -43,7 +43,48 @@ def init_db():
 init_db()
 
 # ====================================================================
-# AGENTE DE IA & PITCHES
+# GERADOR DE LEADS COM TRATAMENTO ESTRITO DE NÚMERO
+# ====================================================================
+
+def buscar_e_gerar_leads(nicho, cidade):
+    conn = sqlite3.connect(DB_NAME)
+    cursor = conn.cursor()
+
+    prefixos = ["Studio", "Espaço", "Centro de Beleza", "Barbearia", "Clínica", "Ateliê", "Concept", "Grupo"]
+    sobrenomes = ["VIP", "Elegance", "Prime", "Imperial", "Central", "Master", "Luxo", "Style"]
+
+    ddd = "21" if "rio" in cidade.lower() or "rj" in cidade.lower() else "11"
+
+    for i in range(1, 9):
+        nome_empresa = f"{random.choice(prefixos)} {random.choice(sobrenomes)} - {nicho}"
+        
+        # Gerando partes numéricas
+        parte1 = random.randint(6000, 9999)
+        parte2 = random.randint(1000, 9999)
+        
+        # Telefone formatado para exibição visual
+        telefone = f"({ddd}) 9{parte1}-{parte2}"
+        
+        # OBRIGATÓRIO: Apenas dígitos (Sem -, sem (), sem espaços)
+        clean_phone = f"55{ddd}9{parte1}{parte2}"
+
+        has_site = (i % 2 == 0)
+        slug = re.sub(r'[^a-zA-Z0-9]', '', nome_empresa.lower())
+        website = f"https://www.{slug}.com.br" if has_site else None
+        rating = round(random.uniform(4.3, 5.0), 1)
+        reviews = random.randint(12, 190)
+        address = f"Av. Principal, {random.randint(100, 1500)} - {cidade}"
+
+        cursor.execute('''
+            INSERT INTO leads (name, niche, location, phone, clean_phone, website, rating, reviews, address)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (nome_empresa, nicho, cidade, telefone, clean_phone, website, rating, reviews, address))
+
+    conn.commit()
+    conn.close()
+
+# ====================================================================
+# AGENTE DE IA & GERADOR DE COPY
 # ====================================================================
 
 def aplicar_spintax(texto):
@@ -65,7 +106,7 @@ EMPRESA: {nome} | NICHO: {nicho} | POSSUI SITE: {'SIM' if possui_site_bool else 
 REGRAS:
 1. NÃO mencione cidade, nota do Google ou quantidade de avaliações.
 2. NÃO ofereça demonstração ou modelo.
-3. Foque na perda de clientes por falta de site ou lenteza mobile.
+3. Foque na perda de clientes por falta de site ou lentidão mobile.
 4. Termine perguntando se a pessoa tem interesse no serviço de melhoria do site.
 """
             url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={api_key.strip()}"
@@ -87,40 +128,6 @@ REGRAS:
         cta = "{Você teria interesse no serviço de criação de site profissional para atração de novos contatos?}"
 
     return aplicar_spintax(f"{saudacao}!\n\n{corpo}\n\n{cta}")
-
-# ====================================================================
-# MOTOR DE BUSCA LEVE (SEM CONSUMO EXCESSIVO DE RAM)
-# ====================================================================
-
-def buscar_e_gerar_leads(nicho, cidade):
-    conn = sqlite3.connect(DB_NAME)
-    cursor = conn.cursor()
-
-    prefixos = ["Studio", "Espaço", "Centro de Beleza", "Barbearia", "Clínica", "Ateliê", "Concept", "Grupo"]
-    sobrenomes = ["VIP", "Elegance", "Prime", "Imperial", "Central", "Master", "Luxo", "Style"]
-
-    ddd = "21" if "rio" in cidade.lower() or "rj" in cidade.lower() else "11"
-
-    for i in range(1, 9):
-        nome_empresa = f"{random.choice(prefixos)} {random.choice(sobrenomes)} - {nicho}"
-        num_tel = f"9{random.randint(6000, 9999)}-{random.randint(1000, 9999)}"
-        telefone = f"({ddd}) {num_tel}"
-        clean_phone = f"55{ddd}{re.sub(r'\\D', '', num_tel)}"
-
-        has_site = (i % 2 == 0)
-        slug = re.sub(r'[^a-zA-Z0-9]', '', nome_empresa.lower())
-        website = f"https://www.{slug}.com.br" if has_site else None
-        rating = round(random.uniform(4.3, 5.0), 1)
-        reviews = random.randint(12, 190)
-        address = f"Av. Principal, {random.randint(100, 1500)} - {cidade}"
-
-        cursor.execute('''
-            INSERT INTO leads (name, niche, location, phone, clean_phone, website, rating, reviews, address)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (nome_empresa, nicho, cidade, telefone, clean_phone, website, rating, reviews, address))
-
-    conn.commit()
-    conn.close()
 
 # ====================================================================
 # ROTAS FLASK
